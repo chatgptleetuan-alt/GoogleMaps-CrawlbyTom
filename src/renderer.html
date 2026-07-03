@@ -23,22 +23,23 @@
       <div class="topbar">
         <input id="campaignName" placeholder="Ten chien dich">
         <input id="search" placeholder="Loc bang ket qua">
+        <button id="newCampaign">Chien dich moi</button>
         <button id="start" class="primary">Bat dau quet</button>
         <button id="stop">Dung</button>
       </div>
       <div class="campaignGrid">
         <aside class="scanPanel">
           <div class="scanGroup keywordsGroup">
-            <h2>Tu khoa</h2>
-            <textarea id="keywords">gara xe da nang</textarea>
+            <div class="groupTitle">Tu khoa</div>
+            <textarea id="keywords" placeholder="Moi dong mot keyword">gara xe da nang</textarea>
           </div>
           <div class="scanGroup modeGroup">
-            <h2>Khu vuc</h2>
+            <div class="groupTitle">Khu vuc</div>
             <div class="segmented">
-              <label><input name="locationMode" type="radio" value="city" checked> Thanh pho</label>
-              <label><input name="locationMode" type="radio" value="address"> Dia chi</label>
-              <label><input name="locationMode" type="radio" value="mapsLink"> Link Maps</label>
-              <label><input name="locationMode" type="radio" value="current"> Hien tai</label>
+              <label><input name="locationMode" type="radio" value="city" checked><span>Thanh pho</span></label>
+              <label><input name="locationMode" type="radio" value="address"><span>Dia chi</span></label>
+              <label><input name="locationMode" type="radio" value="mapsLink"><span>Link Maps</span></label>
+              <label><input name="locationMode" type="radio" value="current"><span>Hien tai</span></label>
             </div>
             <div class="grid4">
               <input id="province" placeholder="Tinh/Thanh">
@@ -52,7 +53,7 @@
             </div>
           </div>
           <div class="scanGroup runGroup">
-            <h2>Thiet lap</h2>
+            <div class="groupTitle">Thiet lap</div>
             <div class="grid3">
               <input id="maxResults" type="number" placeholder="Ket qua">
               <input id="threads" type="number" placeholder="Luong">

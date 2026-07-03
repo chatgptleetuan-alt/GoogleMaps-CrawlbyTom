@@ -43,7 +43,7 @@ body {
 .topbar {
   height: 40px;
   display: grid;
-  grid-template-columns: 200px 1fr 112px 66px;
+  grid-template-columns: 200px 1fr 128px 112px 66px;
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -66,7 +66,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   height: calc(100vh - 64px);
   min-height: 0;
   display: grid;
-  grid-template-rows: 154px 1fr;
+  grid-template-rows: 176px 1fr;
   grid-template-columns: 1fr;
   gap: 10px;
 }
@@ -77,23 +77,27 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 }
 .scanPanel {
   overflow: hidden;
-  padding: 10px;
+  padding: 9px;
   display: grid;
-  grid-template-columns: 235px minmax(420px, 1fr) 330px;
+  grid-template-columns: 235px minmax(480px, 1fr) 330px;
   align-items: start;
   gap: 10px;
 }
 .scanGroup { min-width: 0; display: grid; gap: 6px; }
-.keywordsGroup textarea { min-height: 102px; height: 102px; }
+.groupTitle { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #334155; height: 18px; }
+.keywordsGroup textarea { min-height: 132px; height: 132px; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .segmented label, .check {
   display: flex;
   gap: 6px;
   align-items: center;
+  justify-content: center;
   background: #f3f6fb;
   border-radius: 6px;
-  padding: 7px;
+  min-height: 34px;
+  padding: 6px 8px;
 }
+.segmented label span { line-height: 1.15; text-align: center; }
 .check input { width: auto; }
 .inline { display: inline-flex; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -106,7 +110,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 34px 38px 36px 1fr 130px;
+  grid-template-rows: 34px 38px 36px 1fr 122px;
 }
 .keywordTabs {
   display: flex;
@@ -182,7 +186,7 @@ td a { color: #08745f; font-weight: 700; text-decoration: none; }
 .rowBtn { width: auto; padding: 4px 6px; white-space: nowrap; }
 .logs { min-height: 0; background: #101216; color: #e9edf5; border-radius: 0 0 8px 8px; }
 .logTitle { padding: 7px 10px; border-bottom: 1px solid #2c3340; font-size: 12px; font-weight: 800; }
-pre { height: 92px; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; font: 12px Consolas, monospace; }
+pre { height: 84px; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; font: 12px Consolas, monospace; }
 .hint { margin: -4px 0 8px; color: #607086; font-size: 13px; }
 .panelHead {
   height: 48px;

@@ -227,6 +227,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (result?.message) alert(result.message);
   });
   $("openRelease").addEventListener("click", () => window.crawler.openExternal("https://github.com/chatgptleetuan-alt/GoogleMaps-CrawlbyTom/releases"));
+  $("newCampaign").addEventListener("click", async () => {
+    await window.crawler.saveConfig(readConfig());
+    $("campaignName").value = `Scan ${new Date().toLocaleString()}`;
+    $("search").value = "";
+    activeCampaignId = "";
+    activeKeyword = "all";
+    selectedRows.clear();
+    render(await window.crawler.getState());
+  });
   $("start").addEventListener("click", async () => {
     activeCampaignId = "";
     activeKeyword = "all";
