@@ -28,38 +28,48 @@
       </div>
       <div class="campaignGrid">
         <aside class="scanPanel">
-          <h2>Tu khoa & khu vuc</h2>
-          <textarea id="keywords">gara xe da nang</textarea>
-          <div class="segmented">
-            <label><input name="locationMode" type="radio" value="city" checked> Thanh pho</label>
-            <label><input name="locationMode" type="radio" value="address"> Dia chi</label>
-            <label><input name="locationMode" type="radio" value="mapsLink"> Link Maps</label>
-            <label><input name="locationMode" type="radio" value="current"> Hien tai</label>
+          <div class="scanGroup keywordsGroup">
+            <h2>Tu khoa</h2>
+            <textarea id="keywords">gara xe da nang</textarea>
           </div>
-          <div class="grid2">
-            <input id="province" placeholder="Tinh/Thanh">
-            <input id="city" placeholder="Thanh pho">
-            <input id="district" placeholder="Quan/Huyen">
-            <input id="radiusKm" type="number" placeholder="Ban kinh km">
+          <div class="scanGroup modeGroup">
+            <h2>Khu vuc</h2>
+            <div class="segmented">
+              <label><input name="locationMode" type="radio" value="city" checked> Thanh pho</label>
+              <label><input name="locationMode" type="radio" value="address"> Dia chi</label>
+              <label><input name="locationMode" type="radio" value="mapsLink"> Link Maps</label>
+              <label><input name="locationMode" type="radio" value="current"> Hien tai</label>
+            </div>
+            <div class="grid4">
+              <input id="province" placeholder="Tinh/Thanh">
+              <input id="city" placeholder="Thanh pho">
+              <input id="district" placeholder="Quan/Huyen">
+              <input id="radiusKm" type="number" placeholder="Ban kinh km">
+            </div>
+            <div class="grid2">
+              <input id="address" placeholder="Dia chi trung tam">
+              <input id="mapsLink" placeholder="Link Google Maps/toa do">
+            </div>
           </div>
-          <input id="address" placeholder="Dia chi trung tam de quet quanh khu vuc">
-          <input id="mapsLink" placeholder="Paste link Google Maps hoac toa do">
-          <div class="grid2">
-            <input id="currentLat" placeholder="Lat hien tai">
-            <input id="currentLng" placeholder="Lng hien tai">
+          <div class="scanGroup runGroup">
+            <h2>Thiet lap</h2>
+            <div class="grid3">
+              <input id="maxResults" type="number" placeholder="Ket qua">
+              <input id="threads" type="number" placeholder="Luong">
+              <input id="retry" type="number" placeholder="Retry">
+              <input id="delayMin" type="number" step="0.5" placeholder="Delay min">
+              <input id="delayMax" type="number" step="0.5" placeholder="Delay max">
+              <select id="browserChannel"><option value="msedge">Edge</option><option value="chrome">Chrome</option></select>
+            </div>
+            <div class="grid2">
+              <input id="currentLat" placeholder="Lat hien tai">
+              <input id="currentLng" placeholder="Lng hien tai">
+            </div>
+            <div class="runButtons">
+              <button id="locate">Dinh vi</button>
+              <label class="check"><input id="headless" type="checkbox"> Chay an</label>
+            </div>
           </div>
-          <button id="locate">Dinh vi vi tri hien tai</button>
-
-          <h2>Thiet lap chay</h2>
-          <div class="grid3">
-            <input id="maxResults" type="number" placeholder="Ket qua/keyword">
-            <input id="threads" type="number" placeholder="So luong">
-            <input id="retry" type="number" placeholder="Retry">
-            <input id="delayMin" type="number" step="0.5" placeholder="Delay min">
-            <input id="delayMax" type="number" step="0.5" placeholder="Delay max">
-            <select id="browserChannel"><option value="msedge">Edge</option><option value="chrome">Chrome</option></select>
-          </div>
-          <label class="check"><input id="headless" type="checkbox"> Chay an trinh duyet</label>
         </aside>
 
         <section class="resultsArea">

@@ -98,8 +98,8 @@ function renderRows() {
       <td>${esc(row.rating || "")}</td>
       <td>${esc(row.review_count || 0)}</td>
       <td class="ok">${esc(row.status || "Thanh cong")}</td>
-      <td>${row.google_maps_url ? `<button class="rowBtn" data-open="${esc(row.google_maps_url)}">Maps</button>` : ""}</td>
-      <td><button class="rowBtn danger" data-delete="${esc(row.id)}">Xoa</button></td>
+      <td>${row.google_maps_url ? `<button class="rowBtn" title="Mo Google Maps" data-open="${esc(row.google_maps_url)}">Map</button>` : ""}</td>
+      <td><button class="rowBtn danger" title="Xoa dong" data-delete="${esc(row.id)}">X</button></td>
     </tr>
   `).join("");
   $("headCheck").checked = rows.length > 0 && rows.every((row) => selectedRows.has(row.id));
