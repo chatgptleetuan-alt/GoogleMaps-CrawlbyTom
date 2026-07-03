@@ -79,7 +79,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   overflow: hidden;
   padding: 8px;
   display: grid;
-  grid-template-columns: 215px minmax(520px, 1fr) 310px;
+  grid-template-columns: 205px minmax(480px, 1fr) 400px;
   align-items: start;
   gap: 8px;
 }
@@ -127,7 +127,8 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.runButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: stretch; }
+.setupLocationRow { display: grid; grid-template-columns: 1fr 1fr 82px 88px; gap: 6px; align-items: stretch; }
+.setupLocationRow .check { min-width: 0; padding-inline: 6px; white-space: nowrap; }
 .primary { background: #0a8f78; color: #fff; }
 .danger { background: #b93535; color: #fff; }
 .resultsArea {
@@ -237,5 +238,6 @@ pre { height: 84px; overflow: auto; margin: 0; padding: 8px 10px; white-space: p
 .tall { height: 360px; margin: 8px 0; }
 @media (max-width: 1200px) {
   body { grid-template-columns: 164px 1fr; }
-  .scanPanel { grid-template-columns: 205px minmax(430px, 1fr) 290px; }
+  .scanPanel { grid-template-columns: 195px minmax(400px, 1fr) 360px; }
+  .setupLocationRow { grid-template-columns: 1fr 1fr 76px 82px; }
 }
