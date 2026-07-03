@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Google Maps Crawler Desktop</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="brand">GMap Crawler</div>
+    <button class="nav active" data-page="campaigns">Quan ly chien dich</button>
+    <button class="nav" data-page="history">Lich su scan</button>
+    <button class="nav" data-page="config">Cau hinh va proxy</button>
+    <button class="nav" data-page="license">Ban quyen va cap nhat</button>
+    <div class="statusBox">
+      <b id="runState">Ready</b>
+      <span id="totalRows">0 ket qua</span>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <section class="page active" id="page-campaigns">
+      <div class="topbar">
+        <input id="campaignName" placeholder="Ten chien dich">
+        <input id="search" placeholder="Loc bang ket qua">
+        <button id="start" class="primary">Bat dau quet</button>
+        <button id="stop">Dung</button>
+      </div>
+      <div class="campaignGrid">
+        <aside class="scanPanel">
+          <h2>Tu khoa & khu vuc</h2>
+          <textarea id="keywords">gara xe da nang</textarea>
+          <div class="segmented">
+            <label><input name="locationMode" type="radio" value="city" checked> Thanh pho</label>
+            <label><input name="locationMode" type="radio" value="address"> Dia chi</label>
+            <label><input name="locationMode" type="radio" value="mapsLink"> Link Maps</label>
+            <label><input name="locationMode" type="radio" value="current"> Hien tai</label>
+          </div>
+          <div class="grid2">
+            <input id="province" placeholder="Tinh/Thanh">
+            <input id="city" placeholder="Thanh pho">
+            <input id="district" placeholder="Quan/Huyen">
+            <input id="radiusKm" type="number" placeholder="Ban kinh km">
+          </div>
+          <input id="address" placeholder="Dia chi trung tam de quet quanh khu vuc">
+          <input id="mapsLink" placeholder="Paste link Google Maps hoac toa do">
+          <div class="grid2">
+            <input id="currentLat" placeholder="Lat hien tai">
+            <input id="currentLng" placeholder="Lng hien tai">
+          </div>
+          <button id="locate">Dinh vi vi tri hien tai</button>
+
+          <h2>Thiet lap chay</h2>
+          <div class="grid3">
+            <input id="maxResults" type="number" placeholder="Ket qua/keyword">
+            <input id="threads" type="number" placeholder="So luong">
+            <input id="retry" type="number" placeholder="Retry">
+            <input id="delayMin" type="number" step="0.5" placeholder="Delay min">
+            <input id="delayMax" type="number" step="0.5" placeholder="Delay max">
+            <select id="browserChannel"><option value="msedge">Edge</option><option value="chrome">Chrome</option></select>
+          </div>
+          <label class="check"><input id="headless" type="checkbox"> Chay an trinh duyet</label>
+        </aside>
+
+        <section class="resultsArea">
+          <div class="keywordTabs" id="keywordTabs"></div>
+          <div class="actions">
+            <button id="selectAllColumns">Chon/bo chon cot</button>
+            <button id="deleteSelected" class="danger">Xoa dong chon</button>
+            <button id="clearVisible" class="danger">Xoa tab hien tai</button>
+            <button id="xlsx" class="primary">Xuat Excel</button>
+            <button id="csv">Xuat CSV</button>
+            <label class="check inline"><input id="deleteAfterExport" type="checkbox"> Xuat xong xoa</label>
+          </div>
+          <div class="columns" id="columns"></div>
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><input id="headCheck" type="checkbox"></th>
+                  <th>STT</th><th>Tu khoa</th><th>Ten dia diem</th><th>So dien thoai</th><th>Website</th><th>Dia chi</th><th>Toa do</th><th>KC km</th><th>Sao</th><th>Danh gia</th><th>Trang thai</th><th>Maps</th><th>Xoa</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="logs">
+            <div class="logTitle">NHAT KY HOAT DONG</div>
+            <pre id="logs"></pre>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="page" id="page-history">
+      <div class="panelHead"><h1>Lich su scan</h1><button id="openFolder">Mo thu muc data</button></div>
+      <p class="hint">Click vao mot chien dich de xem lai danh sach ket qua da luu cua chien dich do.</p>
+      <div class="list" id="historyList"></div>
+    </section>
+
+    <section class="page" id="page-config">
+      <div class="configGrid">
+        <section class="card">
+          <h1>Cau hinh proxy</h1>
+          <label>Paste nhieu proxy, moi dong mot proxy</label>
+          <textarea id="proxyList" class="tall" placeholder="http://user:pass@host:port"></textarea>
+          <label>Hoac URL lay danh sach proxy</label>
+          <input id="proxyUrl" placeholder="https://domain.com/proxies.txt">
+          <button id="saveConfig" class="primary">Luu cau hinh</button>
+        </section>
+        <section class="card">
+          <h1>Cot xuat du lieu</h1>
+          <div id="exportColumns" class="columnBox"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="page" id="page-license">
+      <div class="card">
+        <h1>Ban quyen va cap nhat</h1>
+        <p>Ban local: <b id="version">1.1.0</b></p>
+        <p>Trang thai: <b id="licenseStatus">local</b></p>
+        <button id="checkUpdate" class="primary">Mo GitHub de cap nhat</button>
+        <p>App crawl truc tiep Google Maps bang Edge/Chrome. Neu Google yeu cau CAPTCHA/xac minh, app se ghi log va dung tac vu do.</p>
+      </div>
+    </section>
+  </main>
+  <script src="./renderer.js"></script>
+</body>
+</html>

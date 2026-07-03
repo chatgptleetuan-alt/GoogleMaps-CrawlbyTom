@@ -1,0 +1,8 @@
+node_modules/
+release/
+dist/
+github-upload/
+.agents/
+*.log
+npm-debug.log*
+data.json
