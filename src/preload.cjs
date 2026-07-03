@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("crawler", {
   renameCampaign: (id, name) => ipcRenderer.invoke("rename-campaign", id, name),
   exportFile: (options) => ipcRenderer.invoke("export", options),
   currentLocation: () => ipcRenderer.invoke("current-location"),
+  checkUpdate: () => ipcRenderer.invoke("check-update"),
   openDataFolder: () => ipcRenderer.invoke("open-data-folder"),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onState: (callback) => ipcRenderer.on("state", (_event, state) => callback(state))

@@ -19,8 +19,25 @@ npm.cmd run dist:win
 Installer nam tai:
 
 ```text
-release\Google Maps Crawler Desktop Setup 1.0.0.exe
+release\Google Maps Crawler Desktop Setup 1.0.1.exe
 ```
+
+## Cap nhat tu dong
+
+Tu ban `1.0.1`, nut `Tu dong tai va cap nhat` se:
+
+1. Goi GitHub Releases moi nhat cua repo `chatgptleetuan-alt/GoogleMaps-CrawlbyTom`.
+2. Tim file installer `.exe`.
+3. Tai ve thu muc tam.
+4. Chay installer va dong app.
+
+Can tao GitHub Release moi, dat tag vi du `v1.0.1`, va upload file:
+
+```text
+release\Google Maps Crawler Desktop Setup 1.0.1.exe
+```
+
+Neu repo chua co Release hoac Release khong co file `.exe`, nut update se mo trang Releases.
 
 ## Ghi chu
 

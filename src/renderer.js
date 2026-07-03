@@ -53,7 +53,7 @@ function render(state) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.1.0";
+  $("version").textContent = state.license?.version || "1.0.1";
   $("licenseStatus").textContent = state.license?.status || "local";
   renderColumns();
   renderTabs();
@@ -218,7 +218,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("saveConfig").addEventListener("click", async () => render(await window.crawler.saveConfig(readConfig())));
   $("locate").addEventListener("click", locateCurrentPosition);
   $("openFolder").addEventListener("click", () => window.crawler.openDataFolder());
-  $("checkUpdate").addEventListener("click", () => window.crawler.openExternal("https://github.com/chatgptleetuan-alt/GoogleMaps-CrawlbyTom"));
+  $("checkUpdate").addEventListener("click", async () => {
+    $("checkUpdate").disabled = true;
+    $("checkUpdate").textContent = "Dang kiem tra...";
+    const result = await window.crawler.checkUpdate();
+    $("checkUpdate").disabled = false;
+    $("checkUpdate").textContent = "Tu dong tai va cap nhat";
+    if (result?.message) alert(result.message);
+  });
+  $("openRelease").addEventListener("click", () => window.crawler.openExternal("https://github.com/chatgptleetuan-alt/GoogleMaps-CrawlbyTom/releases"));
   $("start").addEventListener("click", async () => {
     activeCampaignId = "";
     activeKeyword = "all";

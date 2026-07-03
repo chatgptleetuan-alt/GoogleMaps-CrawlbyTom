@@ -1,8 +1,12 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const ExcelJS = require("exceljs");
+
+const repoOwner = "chatgptleetuan-alt";
+const repoName = "GoogleMaps-CrawlbyTom";
+const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases`;
 
 let mainWindow;
 let state;
@@ -41,7 +45,7 @@ const defaults = {
   history: [],
   results: [],
   logs: [],
-  license: { status: "local", version: "1.1.0" }
+  license: { status: "local", version: app.getVersion() }
 };
 
 function dataFile() {
@@ -84,6 +88,7 @@ function log(level, message, campaignId = state.currentCampaignId) {
 }
 
 function publicState() {
+  state.license.version = app.getVersion();
   return { ...state, running, columns: allColumns };
 }
 
@@ -127,6 +132,69 @@ ipcMain.handle("open-data-folder", () => shell.openPath(app.getPath("userData"))
 ipcMain.handle("open-external", (_event, url) => {
   if (url) shell.openExternal(url);
 });
+
+ipcMain.handle("check-update", async () => {
+  try {
+    log("info", "Dang kiem tra ban cap nhat tren GitHub Releases...");
+    const release = await githubLatestRelease();
+    const latestVersion = normalizeVersion(release.tag_name || release.name);
+    const currentVersion = normalizeVersion(app.getVersion());
+    if (!latestVersion) throw new Error("Khong doc duoc version cua release moi nhat");
+    if (compareVersions(latestVersion, currentVersion) <= 0) {
+      log("info", `Dang la ban moi nhat: ${app.getVersion()}`);
+      return { ok: true, updated: false, message: `Dang la ban moi nhat (${app.getVersion()})` };
+    }
+    const asset = (release.assets || []).find((item) => /\.exe$/i.test(item.name || "") && /setup|crawler/i.test(item.name || ""));
+    if (!asset) {
+      await shell.openExternal(releasesUrl);
+      throw new Error("Release moi chua co file installer .exe. Da mo trang Releases.");
+    }
+    const target = path.join(app.getPath("temp"), asset.name);
+    log("info", `Dang tai ban ${latestVersion}: ${asset.name}`);
+    await downloadFile(asset.browser_download_url, target);
+    log("info", `Da tai xong. Chay installer: ${target}`);
+    spawn(target, [], { detached: true, stdio: "ignore" }).unref();
+    app.quit();
+    return { ok: true, updated: true, message: "Dang mo installer cap nhat..." };
+  } catch (error) {
+    log("error", `Cap nhat loi: ${error.message}`);
+    return { ok: false, message: error.message };
+  }
+});
+
+async function githubLatestRelease() {
+  const res = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`, {
+    headers: { "user-agent": "GoogleMapsCrawlerDesktop-Updater" }
+  });
+  if (res.status === 404) {
+    await shell.openExternal(releasesUrl);
+    throw new Error("Repo chua co GitHub Release. Can tao Release va upload installer .exe truoc.");
+  }
+  if (!res.ok) throw new Error(`GitHub API HTTP ${res.status}`);
+  return res.json();
+}
+
+async function downloadFile(url, target) {
+  const res = await fetch(url, { headers: { "user-agent": "GoogleMapsCrawlerDesktop-Updater" } });
+  if (!res.ok) throw new Error(`Tai file loi HTTP ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(target, buffer);
+}
+
+function normalizeVersion(value) {
+  const match = String(value || "").match(/\d+\.\d+\.\d+/);
+  return match?.[0] || "";
+}
+
+function compareVersions(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
 
 ipcMain.handle("stop-crawl", () => {
   stopRequested = true;
