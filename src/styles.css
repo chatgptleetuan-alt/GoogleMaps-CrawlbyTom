@@ -143,30 +143,32 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   padding: 4px 8px;
 }
 .columns input, .columnBox input { width: auto; }
-.tableWrap { min-height: 0; overflow: auto; }
-table { border-collapse: collapse; min-width: 1180px; width: 100%; table-layout: fixed; }
+.tableWrap { min-height: 0; overflow-y: auto; overflow-x: hidden; }
+table { border-collapse: collapse; width: 100%; table-layout: fixed; }
 th, td {
   border-bottom: 1px solid #e6ecf3;
   padding: 7px;
   text-align: left;
   font-size: 12px;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 th { position: sticky; top: 0; background: #eef3f9; z-index: 1; }
-th:nth-child(1), td:nth-child(1) { width: 34px; }
-th:nth-child(2), td:nth-child(2) { width: 44px; }
-th:nth-child(3), td:nth-child(3) { width: 66px; }
-th:nth-child(4), td:nth-child(4) { width: 260px; }
-th:nth-child(5), td:nth-child(5) { width: 104px; }
-th:nth-child(6), td:nth-child(6) { width: 120px; }
-th:nth-child(7), td:nth-child(7) { width: 260px; }
-th:nth-child(8), td:nth-child(8) { width: 112px; }
-th:nth-child(9), td:nth-child(9) { width: 60px; }
-th:nth-child(10), td:nth-child(10) { width: 52px; }
-th:nth-child(11), td:nth-child(11) { width: 62px; }
-th:nth-child(12), td:nth-child(12) { width: 76px; }
-th:nth-child(13), td:nth-child(13) { width: 58px; }
-th:nth-child(14), td:nth-child(14) { width: 52px; }
+th:nth-child(1), td:nth-child(1) { width: 3%; }
+th:nth-child(2), td:nth-child(2) { width: 3%; }
+th:nth-child(3), td:nth-child(3) { width: 5%; }
+th:nth-child(4), td:nth-child(4) { width: 17%; }
+th:nth-child(5), td:nth-child(5) { width: 9%; }
+th:nth-child(6), td:nth-child(6) { width: 9%; }
+th:nth-child(7), td:nth-child(7) { width: 18%; }
+th:nth-child(8), td:nth-child(8) { width: 9%; }
+th:nth-child(9), td:nth-child(9) { width: 5%; }
+th:nth-child(10), td:nth-child(10) { width: 4%; }
+th:nth-child(11), td:nth-child(11) { width: 4%; }
+th:nth-child(12), td:nth-child(12) { width: 5%; }
+th:nth-child(13), td:nth-child(13) { width: 4%; }
+th:nth-child(14), td:nth-child(14) { width: 3%; }
 td a { color: #08745f; font-weight: 700; text-decoration: none; }
 .placeName { white-space: normal; word-break: break-word; line-height: 1.35; }
 .muted { color: #718096; font-size: 12px; }

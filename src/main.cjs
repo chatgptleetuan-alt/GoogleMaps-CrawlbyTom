@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const ExcelJS = require("exceljs");
@@ -177,21 +178,76 @@ ipcMain.handle("delete-campaign", (_event, campaignId) => {
 
 ipcMain.handle("current-location", async () => {
   try {
-    const res = await fetch("https://ipapi.co/json/");
-    const data = await res.json();
-    const lat = data.latitude ? String(data.latitude) : "";
-    const lng = data.longitude ? String(data.longitude) : "";
+    const data = await fetchIpLocation();
+    const lat = data.lat ? String(data.lat) : "";
+    const lng = data.lng ? String(data.lng) : "";
+    if (!lat || !lng) throw new Error("Khong co toa do trong phan hoi dinh vi IP");
     state.config.currentLat = lat;
     state.config.currentLng = lng;
     if (data.city) state.config.city = data.city;
     if (data.region) state.config.province = data.region;
+    state.locationOk = true;
     saveState();
-    log("info", `Da dinh vi gan dung theo IP: ${lat}, ${lng}`);
+    log("info", `Da dinh vi vi tri hien tai: ${lat}, ${lng}`);
   } catch (error) {
+    state.locationOk = false;
     log("error", `Khong lay duoc vi tri hien tai: ${error.message}`);
   }
   return publicState();
 });
+
+async function fetchIpLocation() {
+  const windowsLocation = await fetchWindowsLocation().catch(() => null);
+  if (windowsLocation?.lat && windowsLocation?.lng) return windowsLocation;
+  const providers = [
+    {
+      url: "https://ipwho.is/",
+      map: (data) => ({ lat: data.latitude, lng: data.longitude, city: data.city, region: data.region })
+    },
+    {
+      url: "https://ipapi.co/json/",
+      map: (data) => ({ lat: data.latitude, lng: data.longitude, city: data.city, region: data.region })
+    },
+    {
+      url: "https://ipinfo.io/json",
+      map: (data) => {
+        const [lat, lng] = String(data.loc || "").split(",");
+        return { lat, lng, city: data.city, region: data.region };
+      }
+    }
+  ];
+  const errors = [];
+  for (const provider of providers) {
+    try {
+      const res = await fetch(provider.url, { headers: { "user-agent": "GoogleMapsCrawlerDesktop/1.0" } });
+      if (!res.ok) throw new Error(`${provider.url} HTTP ${res.status}`);
+      const mapped = provider.map(await res.json());
+      if (mapped.lat && mapped.lng) return mapped;
+      errors.push(`${provider.url}: empty coordinates`);
+    } catch (error) {
+      errors.push(`${provider.url}: ${error.message}`);
+    }
+  }
+  throw new Error(errors.join("; "));
+}
+
+function fetchWindowsLocation() {
+  return new Promise((resolve, reject) => {
+    const script = [
+      "Add-Type -AssemblyName System.Device",
+      "$watcher = New-Object System.Device.Location.GeoCoordinateWatcher([System.Device.Location.GeoPositionAccuracy]::High)",
+      "$started = $watcher.TryStart($false, [TimeSpan]::FromSeconds(10))",
+      "$coord = $watcher.Position.Location",
+      "if ($started -and -not $coord.IsUnknown) { Write-Output \"$($coord.Latitude),$($coord.Longitude)\" } else { exit 2 }"
+    ].join("; ");
+    execFile("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], { timeout: 13000 }, (error, stdout) => {
+      if (error) return reject(error);
+      const [lat, lng] = String(stdout || "").trim().split(",");
+      if (!lat || !lng) return reject(new Error("Windows Location returned empty coordinates"));
+      resolve({ lat, lng, city: "", region: "" });
+    });
+  });
+}
 
 ipcMain.handle("export", async (_event, options) => {
   if (typeof options === "string") options = { format: options };

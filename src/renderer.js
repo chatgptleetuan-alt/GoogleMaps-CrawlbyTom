@@ -243,11 +243,16 @@ async function locateCurrentPosition() {
       render(await window.crawler.saveConfig(readConfig()));
       alert("Da lay vi tri hien tai bang quyen trinh duyet.");
     }, async () => {
-      render(await window.crawler.currentLocation());
-      alert("Khong lay duoc GPS/permission. Da thu dinh vi gan dung bang IP.");
+      const state = await window.crawler.currentLocation();
+      render(state);
+      if (state.locationOk) alert(`Da lay toa do: ${state.config.currentLat}, ${state.config.currentLng}`);
+      else alert("Khong lay duoc GPS/permission va IP cung khong tra ve toa do. Ban co the nhap Lat/Lng thu cong.");
     }, { enableHighAccuracy: true, timeout: 12000 });
   } else {
-    render(await window.crawler.currentLocation());
+    const state = await window.crawler.currentLocation();
+    render(state);
+    if (state.locationOk) alert(`Da lay toa do: ${state.config.currentLat}, ${state.config.currentLng}`);
+    else alert("Khong lay duoc toa do. Ban co the nhap Lat/Lng thu cong.");
   }
 }
 
