@@ -9,7 +9,7 @@ let running = false;
 let stopRequested = false;
 
 const allColumns = [
-  "keyword", "business_name", "phone_number", "website", "address", "latitude", "longitude",
+  "keyword", "search_location", "business_name", "phone_number", "website", "address", "latitude", "longitude",
   "distance_km", "rating", "review_count", "category", "google_maps_url", "status", "created_at"
 ];
 
@@ -308,7 +308,7 @@ async function launchBrowser(chromium, config, proxyText, workerIndex) {
 async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   const target = buildSearchTarget(keyword, config);
   log("info", `Luong ${workerNo}: quet "${keyword}" tai ${target.label}`, campaignId);
-  const existingCount = state.results.filter((row) => row.keyword === keyword).length;
+  const existingCount = state.results.filter((row) => row.keyword === keyword && row.search_scope === target.scopeKey).length;
   const wantNew = Number(config.maxResults || 50);
   const crawlDepth = Math.min(500, existingCount + wantNew);
   const urls = await collectPlaceUrls(page, target.url, crawlDepth, campaignId);
@@ -318,6 +318,8 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
     if (stopRequested) break;
     const lead = await retry(() => extractPlace(page, url, keyword, campaignId), Number(config.retry || 0), campaignId);
     if (lead?.business_name) {
+      lead.search_scope = target.scopeKey;
+      lead.search_location = target.label;
       applyDistance(lead, config);
       const exists = isDuplicate(lead);
       if (exists) {
@@ -341,25 +343,33 @@ function buildSearchTarget(keyword, config) {
   if (mode === "mapsLink" && config.mapsLink) {
     const coords = coordsFromText(config.mapsLink);
     if (coords) {
+      const scopeKey = `maps:${coords.lat},${coords.lng}:r${Number(config.radiusKm || 5)}`;
       return {
         label: `link Maps ${coords.lat},${coords.lng}`,
+        scopeKey,
         url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${Number(config.radiusKm || 5) + 10}z`
       };
     }
-    return { label: "link Maps", url: config.mapsLink };
+    return { label: "link Maps", scopeKey: `mapslink:${config.mapsLink}`, url: config.mapsLink };
   }
   if (mode === "address" && config.address) {
     const query = `${keyword} near ${config.address}`;
-    return { label: config.address, url: `https://www.google.com/maps/search/${encodeURIComponent(query)}` };
+    return { label: config.address, scopeKey: `address:${normalizeScope(config.address)}:r${Number(config.radiusKm || 5)}`, url: `https://www.google.com/maps/search/${encodeURIComponent(query)}` };
   }
   if (mode === "current" && config.currentLat && config.currentLng) {
+    const scopeKey = `current:${config.currentLat},${config.currentLng}:r${Number(config.radiusKm || 5)}`;
     return {
       label: `vi tri hien tai ${config.currentLat},${config.currentLng}`,
+      scopeKey,
       url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${config.currentLat},${config.currentLng},${Number(config.radiusKm || 5) + 10}z`
     };
   }
   const place = [config.district, config.city, config.province].filter(Boolean).join(", ");
-  return { label: place || "Google Maps", url: `https://www.google.com/maps/search/${encodeURIComponent(`${keyword} ${place}`.trim())}` };
+  return { label: place || "Google Maps", scopeKey: `city:${normalizeScope(place || "global")}`, url: `https://www.google.com/maps/search/${encodeURIComponent(`${keyword} ${place}`.trim())}` };
+}
+
+function normalizeScope(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function coordsFromText(text) {

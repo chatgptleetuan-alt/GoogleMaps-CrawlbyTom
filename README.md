@@ -26,7 +26,8 @@ release\Google Maps Crawler Desktop Setup 1.0.0.exe
 
 - App crawl truc tiep Google Maps bang Edge/Chrome, khong can API key.
 - Quet theo thanh pho, dia chi trung tam, link Google Maps/toa do, hoac vi tri hien tai gan dung theo IP.
-- Khi quet lai cung keyword, app keo sau hon so ket qua da co de co gang lay them data moi thay vi ket thuc sau khi gap dong trung.
+- Khi quet lai cung keyword va cung khu vuc/link/toa do, app keo sau hon so ket qua da co de co gang lay them data moi thay vi ket thuc sau khi gap dong trung.
+- Cung keyword nhung doi khu vuc/link/toa do se duoc tinh la mot search moi va quet tu dau cho khu vuc do.
 - Co cot `distance_km` tinh khoang cach tu vi tri hien tai hoac toa do/link Maps dang cau hinh.
 - Proxy co the paste nhieu dong hoac lay tu URL proxy list. App xoay proxy theo luong.
 - Co so luong luong, delay, retry, log hoat dong, tab ket qua theo keyword.
