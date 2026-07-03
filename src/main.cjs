@@ -264,6 +264,22 @@ ipcMain.handle("current-location", async () => {
   return publicState();
 });
 
+ipcMain.handle("browserleaks-location", async () => {
+  try {
+    log("info", "Dang mo BrowserLeaks Geo. Hay bam Allow neu trinh duyet hoi quyen vi tri.");
+    const coords = await fetchBrowserLeaksLocation();
+    state.config.currentLat = String(coords.lat);
+    state.config.currentLng = String(coords.lng);
+    state.locationOk = true;
+    saveState();
+    log("info", `Da lay toa do tu BrowserLeaks: ${coords.lat}, ${coords.lng}`);
+  } catch (error) {
+    state.locationOk = false;
+    log("error", `BrowserLeaks khong tra ve toa do: ${error.message}`);
+  }
+  return publicState();
+});
+
 async function fetchIpLocation() {
   const windowsLocation = await fetchWindowsLocation().catch(() => null);
   if (windowsLocation?.lat && windowsLocation?.lng) return windowsLocation;
@@ -314,6 +330,76 @@ function fetchWindowsLocation() {
       if (!lat || !lng) return reject(new Error("Windows Location returned empty coordinates"));
       resolve({ lat, lng, city: "", region: "" });
     });
+  });
+}
+
+async function fetchBrowserLeaksLocation() {
+  const { chromium } = require("playwright-core");
+  const profileDir = path.join(app.getPath("userData"), "browserleaks-profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  const context = await chromium.launchPersistentContext(profileDir, {
+    headless: false,
+    channel: state.config.browserChannel || "msedge",
+    viewport: { width: 1100, height: 820 },
+    args: ["--lang=vi-VN"]
+  });
+  const page = context.pages()[0] || await context.newPage();
+  try {
+    await page.goto("https://browserleaks.com/geo", { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(1500);
+    await clickGeoButton(page);
+    const started = Date.now();
+    while (Date.now() - started < 90000) {
+      const coords = await readCoordsFromPage(page);
+      if (coords) return coords;
+      await page.waitForTimeout(1000);
+    }
+    throw new Error("Het thoi gian cho. Co the ban chua bam Allow hoac trinh duyet khong cap quyen vi tri.");
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
+
+async function clickGeoButton(page) {
+  const candidates = [
+    () => page.getByText("Get Current Position", { exact: true }).click({ timeout: 5000 }),
+    () => page.locator("button").filter({ hasText: "Get Current Position" }).click({ timeout: 5000 }),
+    () => page.locator("input[type='button'],button").evaluateAll((items) => {
+      const item = items.find((el) => /Get Current Position/i.test(el.textContent || el.value || ""));
+      if (item) item.click();
+    })
+  ];
+  for (const attempt of candidates) {
+    try {
+      await attempt();
+      return;
+    } catch {}
+  }
+}
+
+async function readCoordsFromPage(page) {
+  return page.evaluate(() => {
+    const text = document.body.innerText || "";
+    const byLabel = (label) => {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = text.match(new RegExp(`${escaped}\\s*[:\\n\\t ]+(-?\\d+(?:\\.\\d+)?)`, "i"));
+      return match?.[1] || "";
+    };
+    let lat = byLabel("Latitude");
+    let lng = byLabel("Longitude");
+    if (!lat || !lng) {
+      const pair = text.match(/(-?\d{1,3}\.\d{4,})\s*[,;\n ]+\s*(-?\d{1,3}\.\d{4,})/);
+      if (pair) {
+        lat = pair[1];
+        lng = pair[2];
+      }
+    }
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    if (Number.isFinite(latNum) && Number.isFinite(lngNum) && Math.abs(latNum) <= 90 && Math.abs(lngNum) <= 180) {
+      return { lat: latNum, lng: lngNum };
+    }
+    return null;
   });
 }
 

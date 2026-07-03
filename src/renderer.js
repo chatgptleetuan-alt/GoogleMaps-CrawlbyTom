@@ -217,6 +217,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("search").addEventListener("input", renderRows);
   $("saveConfig").addEventListener("click", async () => render(await window.crawler.saveConfig(readConfig())));
   $("locate").addEventListener("click", locateCurrentPosition);
+  $("browserLeaks").addEventListener("click", locateWithBrowserLeaks);
   $("openFolder").addEventListener("click", () => window.crawler.openDataFolder());
   $("checkUpdate").addEventListener("click", async () => {
     $("checkUpdate").disabled = true;
@@ -250,6 +251,14 @@ function showPage(page) {
   document.querySelectorAll(".nav").forEach((item) => item.classList.toggle("active", item.dataset.page === page));
   document.querySelectorAll(".page").forEach((item) => item.classList.remove("active"));
   $(`page-${page}`).classList.add("active");
+}
+
+async function locateWithBrowserLeaks() {
+  alert("App se mo BrowserLeaks Geo trong Chrome/Edge. Neu trinh duyet hoi quyen vi tri, hay bam Allow roi cho app tu dien Lat/Lng.");
+  const state = await window.crawler.browserLeaksLocation();
+  render(state);
+  if (state.locationOk) alert(`Da lay toa do BrowserLeaks: ${state.config.currentLat}, ${state.config.currentLng}`);
+  else alert("BrowserLeaks khong tra ve toa do. Kiem tra log hoac nhap Lat/Lng thu cong.");
 }
 
 async function locateCurrentPosition() {
