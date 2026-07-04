@@ -127,6 +127,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.runSettingsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .previewRow { display: grid; grid-template-columns: 128px 1fr 78px; gap: 6px; }
 .previewRow input { background: #f8fafc; }
 .setupLocationRow { display: grid; grid-template-columns: 1fr 1fr 66px 58px 78px; gap: 6px; align-items: stretch; }
@@ -192,20 +193,21 @@ th, td {
   word-break: break-word;
 }
 th { position: sticky; top: 0; background: #eef3f9; z-index: 1; }
-th:nth-child(1), td:nth-child(1) { width: 2.6%; }
-th:nth-child(2), td:nth-child(2) { width: 3%; }
-th:nth-child(3), td:nth-child(3) { width: 4.8%; }
-th:nth-child(4), td:nth-child(4) { width: 18%; }
-th:nth-child(5), td:nth-child(5) { width: 9.2%; }
-th:nth-child(6), td:nth-child(6) { width: 8.7%; }
-th:nth-child(7), td:nth-child(7) { width: 20%; }
-th:nth-child(8), td:nth-child(8) { width: 8.5%; }
+th:nth-child(1), td:nth-child(1) { width: 2.4%; }
+th:nth-child(2), td:nth-child(2) { width: 2.8%; }
+th:nth-child(3), td:nth-child(3) { width: 4.6%; }
+th:nth-child(4), td:nth-child(4) { width: 17%; }
+th:nth-child(5), td:nth-child(5) { width: 8.4%; }
+th:nth-child(6), td:nth-child(6) { width: 7.8%; }
+th:nth-child(7), td:nth-child(7) { width: 18%; }
+th:nth-child(8), td:nth-child(8) { width: 8%; }
 th:nth-child(9), td:nth-child(9) { width: 4.5%; }
-th:nth-child(10), td:nth-child(10) { width: 3.7%; }
-th:nth-child(11), td:nth-child(11) { width: 4.5%; }
-th:nth-child(12), td:nth-child(12) { width: 5.2%; }
-th:nth-child(13), td:nth-child(13) { width: 3.8%; }
+th:nth-child(10), td:nth-child(10) { width: 4.5%; }
+th:nth-child(11), td:nth-child(11) { width: 3.5%; }
+th:nth-child(12), td:nth-child(12) { width: 4.5%; }
+th:nth-child(13), td:nth-child(13) { width: 5%; }
 th:nth-child(14), td:nth-child(14) { width: 3.5%; }
+th:nth-child(15), td:nth-child(15) { width: 3.5%; }
 td a { color: #08745f; font-weight: 700; text-decoration: none; }
 .placeName { white-space: normal; word-break: break-word; line-height: 1.35; }
 .muted { color: #718096; font-size: 12px; }

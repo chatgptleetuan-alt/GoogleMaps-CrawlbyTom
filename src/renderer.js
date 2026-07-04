@@ -16,7 +16,7 @@ let previewCoords = null;
 
 const configFields = [
   "province", "city", "district", "address", "mapsLink", "radiusKm", "currentLat", "currentLng",
-  "maxResults", "threads", "delayMin", "delayMax", "retry", "browserChannel", "headless", "proxyList", "proxyUrl"
+  "maxResults", "threads", "delayMin", "delayMax", "retry", "browserChannel", "distanceMode", "headless", "proxyList", "proxyUrl"
 ];
 
 function readConfig() {
@@ -66,7 +66,7 @@ function render(state, options = {}) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.0.4";
+  $("version").textContent = state.license?.version || "1.0.5";
   $("licenseStatus").textContent = state.license?.status || "local";
   renderColumns(options);
   renderTabs(options);
@@ -123,6 +123,7 @@ function renderRows(options = {}) {
       <td>${esc(row.address || "Chua cap nhat")}</td>
       <td>${row.latitude && row.longitude ? `${row.latitude}, ${row.longitude}` : "Chua cap nhat"}</td>
       <td>${esc(row.distance_km || "")}</td>
+      <td>${esc(row.driving_distance_km || "")}</td>
       <td>${esc(row.rating || "")}</td>
       <td>${esc(row.review_count || 0)}</td>
       <td class="ok">${esc(row.status || "Thanh cong")}</td>

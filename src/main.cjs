@@ -17,7 +17,7 @@ const locationCache = new Map();
 
 const allColumns = [
   "keyword", "search_location", "business_name", "phone_number", "website", "address", "latitude", "longitude",
-  "distance_km", "rating", "review_count", "category", "google_maps_url", "status", "created_at"
+  "distance_km", "bird_distance_km", "driving_distance_km", "rating", "review_count", "category", "google_maps_url", "status", "created_at"
 ];
 
 const defaults = {
@@ -37,6 +37,7 @@ const defaults = {
     delayMax: 4000,
     retry: 1,
     threads: 1,
+    distanceMode: "bird",
     headless: false,
     proxyList: "",
     proxyUrl: "",
@@ -554,7 +555,7 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
     if (lead?.business_name) {
       lead.search_scope = target.scopeKey;
       lead.search_location = target.label;
-      applyDistance(lead, config, target);
+      await applyDistance(page, lead, config, target, campaignId);
       const exists = isDuplicate(lead);
       if (exists) {
         log("info", `Bo qua trung: ${lead.business_name}`, campaignId);
@@ -581,6 +582,7 @@ async function buildSearchTarget(page, keyword, config, campaignId) {
       return {
         label: `link Maps ${coords.lat},${coords.lng}`,
         scopeKey,
+        coords,
         url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${Number(config.radiusKm || 5) + 10}z`
       };
     }
@@ -598,6 +600,7 @@ async function buildSearchTarget(page, keyword, config, campaignId) {
     return {
       label: `vi tri hien tai ${config.currentLat},${config.currentLng}`,
       scopeKey,
+      coords: { lat: String(config.currentLat), lng: String(config.currentLng) },
       url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${config.currentLat},${config.currentLng},${Number(config.radiusKm || 5) + 10}z`
     };
   }
@@ -614,16 +617,13 @@ async function previewScanLocation(config) {
     if (!config.currentLat || !config.currentLng) return { ok: false, message: "Chua co Lat/Lng hien tai" };
     return { ok: true, label: "Vi tri hien tai", lat: String(config.currentLat), lng: String(config.currentLng), source: "current" };
   }
-  if (mode === "mapsLink") {
-    const coords = coordsFromText(config.mapsLink);
-    if (!coords) return { ok: false, message: "Link Maps/toa do khong co cap lat,lng hop le" };
-    return { ok: true, label: "Link Maps", lat: coords.lat, lng: coords.lng, source: "mapsLink" };
-  }
-  const label = mode === "address" ? String(config.address || "").trim() : cityPlace(config);
+  const directCoords = coordsFromText(config.mapsLink) || coordsFromText(config.address);
+  if (directCoords) return { ok: true, label: "Toa do/Link Maps", lat: directCoords.lat, lng: directCoords.lng, source: "direct" };
+  const label = locationLabelFromConfig(config);
   if (!label) return { ok: false, message: "Chua nhap khu vuc de dinh vi" };
-  const coords = await fetchNominatimCoords(label, state.currentCampaignId || "");
+  const coords = await fetchNominatimCoords(label, state.currentCampaignId || "") || await fetchGoogleLocationCoords(label, config, state.currentCampaignId || "");
   if (!coords) return { ok: false, message: `Khong dinh vi duoc "${label}"` };
-  return { ok: true, label, lat: coords.lat, lng: coords.lng, source: "OSM" };
+  return { ok: true, label, lat: coords.lat, lng: coords.lng, source: coords.source || "maps" };
 }
 
 function targetFromCoords(keyword, config, label, scopePrefix, coords) {
@@ -645,6 +645,15 @@ async function resolveSearchCenter(page, place, campaignId) {
     locationCache.set(key, nominatimCoords);
     return nominatimCoords;
   }
+  const googleCoords = await resolveGooglePlaceCoords(page, place, campaignId);
+  if (googleCoords) {
+    locationCache.set(key, googleCoords);
+    return googleCoords;
+  }
+  return null;
+}
+
+async function resolveGooglePlaceCoords(page, place, campaignId) {
   try {
     const searchPlace = withVietnam(place);
     await page.goto(`https://www.google.com/maps/place/${encodeURIComponent(searchPlace)}`, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -655,8 +664,7 @@ async function resolveSearchCenter(page, place, campaignId) {
       const coords = coordsFromText(page.url());
       if (coords) {
         log("info", `Da dinh vi khu vuc "${place}" -> ${coords.lat}, ${coords.lng}`, campaignId);
-        locationCache.set(key, coords);
-        return coords;
+        return { ...coords, source: "Google Maps" };
       }
       await page.waitForTimeout(500);
     }
@@ -665,6 +673,22 @@ async function resolveSearchCenter(page, place, campaignId) {
     log("warn", `Loi dinh vi khu vuc "${place}": ${error.message}`, campaignId);
   }
   return null;
+}
+
+async function fetchGoogleLocationCoords(place, config, campaignId) {
+  const { chromium } = require("playwright-core");
+  let browser;
+  try {
+    browser = await launchBrowser(chromium, { ...config, headless: true }, "", 0);
+    const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1200, height: 820 } });
+    const page = await context.newPage();
+    return await resolveGooglePlaceCoords(page, place, campaignId);
+  } catch (error) {
+    log("warn", `Google Maps khong dinh vi duoc "${place}": ${error.message}`, campaignId);
+    return null;
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
 }
 
 async function fetchNominatimCoords(place, campaignId) {
@@ -691,6 +715,14 @@ function cityPlace(config) {
   const cityMatch = onlyProvince.match(/^(?:tp\.?|thanh pho|th.nh ph.)\s+(.+)$/i);
   if (cityMatch) place = `${onlyProvince}, tinh ${cityMatch[1]}`;
   return withVietnam(place);
+}
+
+function locationLabelFromConfig(config) {
+  const mode = config.locationMode || "city";
+  if (mode === "mapsLink") return String(config.mapsLink || "").trim();
+  if (mode === "address") return withVietnam(config.address);
+  if (mode === "current") return [config.currentLat, config.currentLng].filter(Boolean).join(",");
+  return cityPlace(config);
 }
 
 function withVietnam(value) {
@@ -734,12 +766,22 @@ function originCoords(config, target) {
   return null;
 }
 
-function applyDistance(lead, config, target) {
+async function applyDistance(page, lead, config, target, campaignId) {
   const origin = originCoords(config, target);
   const lat = Number(lead.latitude);
   const lng = Number(lead.longitude);
   if (!origin || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-  lead.distance_km = Number(haversineKm(origin.lat, origin.lng, lat, lng).toFixed(2));
+  const birdDistance = Number(haversineKm(origin.lat, origin.lng, lat, lng).toFixed(2));
+  lead.bird_distance_km = birdDistance;
+  lead.distance_km = birdDistance;
+  const mode = config.distanceMode || "bird";
+  if (mode === "drive" || mode === "both") {
+    const drivingDistance = await fetchDrivingDistanceKm(page, origin, { lat, lng }, campaignId);
+    if (drivingDistance) {
+      lead.driving_distance_km = drivingDistance;
+      if (mode === "drive") lead.distance_km = drivingDistance;
+    }
+  }
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -752,6 +794,31 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 
 function toRad(value) {
   return value * Math.PI / 180;
+}
+
+async function fetchDrivingDistanceKm(page, origin, destination, campaignId) {
+  try {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&travelmode=driving`;
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(3500);
+    await assertNoCaptcha(page);
+    const text = await page.locator("body").innerText({ timeout: 8000 });
+    const distance = firstKmFromDirections(text);
+    if (distance) return distance;
+    log("warn", "Khong doc duoc KC lai xe tu Google Maps Directions", campaignId);
+  } catch (error) {
+    log("warn", `Loi lay KC lai xe: ${error.message}`, campaignId);
+  }
+  return "";
+}
+
+function firstKmFromDirections(text) {
+  const normalized = String(text || "").replace(/\u00a0/g, " ");
+  const matches = [...normalized.matchAll(/(\d+(?:[,.]\d+)?)\s*km/gi)]
+    .map((match) => Number(match[1].replace(",", ".")))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!matches.length) return "";
+  return Number(matches[0].toFixed(2));
 }
 
 async function collectPlaceUrls(page, searchUrl, maxResults, campaignId) {
