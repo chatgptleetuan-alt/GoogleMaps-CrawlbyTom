@@ -545,30 +545,46 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   log("info", `Luong ${workerNo}: quet "${keyword}" tai ${target.label}`, campaignId);
   const existingCount = state.results.filter((row) => row.keyword === keyword && row.search_scope === target.scopeKey).length;
   const wantNew = Number(config.maxResults || 50);
-  const crawlDepth = Math.min(500, existingCount + wantNew);
+  const crawlDepth = target.coords ? Math.min(500, Math.max(existingCount + wantNew * 4, wantNew + 25)) : Math.min(500, existingCount + wantNew);
   const urls = await collectPlaceUrls(page, target.url, crawlDepth, campaignId);
   log("info", `Luong ${workerNo}: "${keyword}" da co ${existingCount}, keo ${urls.length} link de lay them ${wantNew}`, campaignId);
-  let inserted = 0;
+  const candidates = [];
+  const localSeen = new Set();
   for (const url of urls) {
     if (stopRequested) break;
     const lead = await retry(() => extractPlace(page, url, keyword, campaignId), Number(config.retry || 0), campaignId);
     if (lead?.business_name) {
       lead.search_scope = target.scopeKey;
       lead.search_location = target.label;
-      await applyDistance(page, lead, config, target, campaignId);
+      applyBirdDistance(lead, config, target);
+      if (isOutsideRadius(lead, config, target)) {
+        log("info", `Bo qua ngoai ban kinh ${config.radiusKm}km: ${lead.business_name} (${lead.bird_distance_km}km)`, campaignId);
+        continue;
+      }
       const exists = isDuplicate(lead);
       if (exists) {
         log("info", `Bo qua trung: ${lead.business_name}`, campaignId);
       } else {
-        state.results.unshift(lead);
-        state.results = state.results.slice(0, 100000);
-        inserted++;
-        log("info", `Them moi ${keyword} #${inserted}: ${lead.business_name}`, campaignId);
-        saveState();
-        sendState();
-        if (inserted >= wantNew) break;
+        const key = duplicateKey(lead);
+        if (!localSeen.has(key)) {
+          localSeen.add(key);
+          candidates.push(lead);
+        }
       }
     }
+    await sleep(randomDelay(config));
+  }
+  if (target.coords) candidates.sort((a, b) => Number(a.bird_distance_km || 999999) - Number(b.bird_distance_km || 999999));
+  let inserted = 0;
+  for (const lead of candidates.slice(0, wantNew)) {
+    if (stopRequested) break;
+    await applyDrivingDistance(page, lead, config, target, campaignId);
+    state.results.unshift(lead);
+    state.results = state.results.slice(0, 100000);
+    inserted++;
+    log("info", `Them moi ${keyword} #${inserted}: ${lead.business_name}`, campaignId);
+    saveState();
+    sendState();
     await sleep(randomDelay(config));
   }
 }
@@ -583,7 +599,7 @@ async function buildSearchTarget(page, keyword, config, campaignId) {
         label: `link Maps ${coords.lat},${coords.lng}`,
         scopeKey,
         coords,
-        url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${Number(config.radiusKm || 5) + 10}z`
+        url: searchUrlAround(keyword, coords, Number(config.radiusKm || 5))
       };
     }
     return { label: "link Maps", scopeKey: `mapslink:${config.mapsLink}`, url: config.mapsLink };
@@ -601,7 +617,7 @@ async function buildSearchTarget(page, keyword, config, campaignId) {
       label: `vi tri hien tai ${config.currentLat},${config.currentLng}`,
       scopeKey,
       coords: { lat: String(config.currentLat), lng: String(config.currentLng) },
-      url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${config.currentLat},${config.currentLng},${Number(config.radiusKm || 5) + 10}z`
+      url: searchUrlAround(keyword, { lat: config.currentLat, lng: config.currentLng }, Number(config.radiusKm || 5))
     };
   }
   const place = cityPlace(config);
@@ -633,8 +649,14 @@ function targetFromCoords(keyword, config, label, scopePrefix, coords) {
     label: `${label} (${coords.lat},${coords.lng})`,
     scopeKey: `${scopePrefix}:${coords.lat},${coords.lng}:r${radius}`,
     coords,
-    url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${zoom}z`
+    url: searchUrlAround(keyword, coords, radius)
   };
+}
+
+function searchUrlAround(keyword, coords, radiusKm) {
+  const zoom = radiusToZoom(radiusKm);
+  const query = `${keyword} near ${coords.lat},${coords.lng}`;
+  return `https://www.google.com/maps/search/${encodeURIComponent(query)}/@${coords.lat},${coords.lng},${zoom}z`;
 }
 
 async function resolveSearchCenter(page, place, campaignId) {
@@ -766,7 +788,7 @@ function originCoords(config, target) {
   return null;
 }
 
-async function applyDistance(page, lead, config, target, campaignId) {
+function applyBirdDistance(lead, config, target) {
   const origin = originCoords(config, target);
   const lat = Number(lead.latitude);
   const lng = Number(lead.longitude);
@@ -774,12 +796,27 @@ async function applyDistance(page, lead, config, target, campaignId) {
   const birdDistance = Number(haversineKm(origin.lat, origin.lng, lat, lng).toFixed(2));
   lead.bird_distance_km = birdDistance;
   lead.distance_km = birdDistance;
+}
+
+function isOutsideRadius(lead, config, target) {
+  if (!target?.coords || !lead.bird_distance_km) return false;
+  const radius = Number(config.radiusKm || 0);
+  return radius > 0 && Number(lead.bird_distance_km) > radius;
+}
+
+async function applyDrivingDistance(page, lead, config, target, campaignId) {
+  const origin = originCoords(config, target);
+  const lat = Number(lead.latitude);
+  const lng = Number(lead.longitude);
+  if (!origin || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
   const mode = config.distanceMode || "bird";
   if (mode === "drive" || mode === "both") {
     const drivingDistance = await fetchDrivingDistanceKm(page, origin, { lat, lng }, campaignId);
     if (drivingDistance) {
       lead.driving_distance_km = drivingDistance;
       if (mode === "drive") lead.distance_km = drivingDistance;
+    } else if (mode === "drive") {
+      lead.distance_km = "";
     }
   }
 }
