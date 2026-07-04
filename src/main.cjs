@@ -897,7 +897,20 @@ async function collectPlaceUrls(page, target, maxResults, campaignId, keyword) {
   let stableRounds = 0;
   for (let round = 0; round < 60 && urls.size < maxResults && !stopRequested; round++) {
     const before = urls.size;
-    const batch = await page.evaluate(() => Array.from(document.querySelectorAll('a[href*="/maps/place/"]')).map((a) => a.href));
+    const batch = await page.evaluate(() => {
+      const isAd = (anchor) => {
+        let node = anchor;
+        for (let i = 0; i < 6 && node; i++) {
+          const text = node.innerText || node.textContent || "";
+          if (/Sponsored|Ad\s*·|Được tài trợ|Duoc tai tro|Quảng cáo|Quang cao/i.test(text)) return true;
+          node = node.parentElement;
+        }
+        return false;
+      };
+      return Array.from(document.querySelectorAll('a[href*="/maps/place/"]'))
+        .filter((anchor) => !isAd(anchor))
+        .map((anchor) => anchor.href);
+    });
     for (const href of batch) urls.add(String(href).split("&")[0]);
     stableRounds = urls.size === before ? stableRounds + 1 : 0;
     if (stableRounds >= 5) break;
@@ -942,13 +955,14 @@ async function clickNearby(page) {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
-      const elements = Array.from(document.querySelectorAll("button, [role='button'], [aria-label]"));
+      const elements = Array.from(document.querySelectorAll("button, [role='button'], [aria-label], div, span"));
       const element = elements.find((el) => {
         const text = fold(`${el.textContent || ""} ${el.getAttribute("aria-label") || ""}`);
-        return text.includes("nearby") || text.includes("gan do") || text.includes("lan can");
+        return (text.includes("nearby") || text.includes("gan do") || text.includes("lan can")) && !text.includes("gan day");
       });
       if (!element) throw new Error("Nearby button not found");
-      element.click();
+      const clickable = element.closest("button, [role='button']") || element;
+      clickable.click();
     })
   ];
   for (const attempt of attempts) {
@@ -964,14 +978,22 @@ async function extractPlace(page, url, keyword, campaignId) {
   await page.waitForTimeout(2200);
   await assertNoCaptcha(page);
   return page.evaluate(({ kw, campaignId }) => {
-    const clean = (value) => value ? String(value).replace(/\s+/g, " ").trim() : "";
+    const clean = (value) => value ? String(value)
+      .replace(/[\uE000-\uF8FF]/g, " ")
+      .replace(/[^\p{L}\p{N}\s.,:/()+\-#&@|]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim() : "";
+    const cleanPhone = (value) => {
+      const text = String(value || "").replace(/[^\d+().\-\s]/g, " ").replace(/\s+/g, " ").trim();
+      return text.match(/\+?\d[\d\s().-]{7,}\d/)?.[0]?.trim() || "";
+    };
     const text = document.body.innerText || "";
     const name = clean(document.querySelector("h1")?.textContent);
     const website = document.querySelector('a[data-item-id="authority"]')?.href
       || Array.from(document.querySelectorAll("a[href^='http']")).map((a) => a.href).find((href) => !/google\.|gstatic\.|schema\.org/.test(href)) || "";
     const byData = (prefix) => clean(document.querySelector(`[data-item-id^="${prefix}"]`)?.innerText);
     const address = byData("address");
-    const phone = byData("phone") || clean(text.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]);
+    const phone = cleanPhone(byData("phone")) || cleanPhone(text);
     const ratingMatch = text.match(/(\d+[,.]\d+)\s*(?:sao|stars?)?/i);
     const reviewMatch = text.match(/\(([\d.,]+)\)/);
     const atMatch = location.href.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
