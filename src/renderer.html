@@ -23,6 +23,7 @@
       <div class="topbar">
         <input id="campaignName" placeholder="Ten chien dich">
         <input id="search" placeholder="Loc bang ket qua">
+        <button id="toggleScanPanel">An thiet lap</button>
         <button id="newCampaign">Chien dich moi</button>
         <button id="start" class="primary">Bat dau quet</button>
         <button id="stop">Dung</button>
@@ -36,22 +37,13 @@
           <div class="scanGroup modeGroup">
             <div class="groupLine">
               <div class="groupTitle">Khu vuc</div>
-              <div class="segmented">
-                <label><input name="locationMode" type="radio" value="city" checked><span>Thanh pho</span></label>
-                <label><input name="locationMode" type="radio" value="address"><span>Dia chi</span></label>
-                <label><input name="locationMode" type="radio" value="mapsLink"><span>Link Maps</span></label>
-                <label><input name="locationMode" type="radio" value="current"><span>Hien tai</span></label>
-              </div>
+              <input id="address" placeholder="Dia chi, link Google Maps hoac toa do">
             </div>
-            <div class="grid4">
-              <input id="province" placeholder="Tinh/Thanh">
-              <input id="city" placeholder="Thanh pho">
-              <input id="district" placeholder="Quan/Huyen">
+            <div class="smartLocationGrid">
+              <input id="province" placeholder="Tinh/TP">
+              <input id="district" placeholder="Phuong/Khu vuc">
               <input id="radiusKm" type="number" placeholder="Ban kinh km">
-            </div>
-            <div class="grid2">
-              <input id="address" placeholder="Dia chi trung tam">
-              <input id="mapsLink" placeholder="Link Google Maps/toa do">
+              <input id="mapsLink" placeholder="Link/toa do phu neu can">
             </div>
             <div class="previewRow">
               <button id="previewLocation">Kiem tra toa do</button>
@@ -137,7 +129,7 @@
     <section class="page" id="page-license">
       <div class="card">
         <h1>Ban quyen va cap nhat</h1>
-        <p>Ban local: <b id="version">1.0.6</b></p>
+        <p>Ban local: <b id="version">1.0.7</b></p>
         <p>Trang thai: <b id="licenseStatus">local</b></p>
         <button id="checkUpdate" class="primary">Tu dong tai va cap nhat</button>
         <button id="openRelease">Mo trang GitHub Releases</button>

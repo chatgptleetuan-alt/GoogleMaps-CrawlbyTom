@@ -43,7 +43,7 @@ body {
 .topbar {
   height: 36px;
   display: grid;
-  grid-template-columns: 200px 1fr 128px 112px 66px;
+  grid-template-columns: 200px 1fr 112px 128px 112px 66px;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -70,6 +70,8 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   grid-template-columns: 1fr;
   gap: 10px;
 }
+.campaignGrid.collapsed { grid-template-rows: 0 1fr; }
+.campaignGrid.collapsed .scanPanel { padding-block: 0; border: 0; overflow: hidden; }
 .scanPanel, .resultsArea, .card, .list {
   background: #fff;
   border: 1px solid #dfe6ef;
@@ -79,7 +81,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   overflow: hidden;
   padding: 7px;
   display: grid;
-  grid-template-columns: 205px minmax(520px, 1fr) 420px;
+  grid-template-columns: 205px minmax(620px, 1fr) 420px;
   align-items: start;
   gap: 8px;
 }
@@ -89,7 +91,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 }
 .scanGroup { min-width: 0; display: grid; gap: 4px; }
 .groupTitle { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #334155; white-space: nowrap; }
-.groupLine { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.groupLine { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; }
 .keywordsGroup textarea { min-height: 110px; height: 110px; }
 .segmented { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .segmented label {
@@ -128,6 +130,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .runSettingsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.smartLocationGrid { display: grid; grid-template-columns: 1fr 1fr 120px 1fr; gap: 6px; }
 .previewRow { display: grid; grid-template-columns: 128px 1fr 78px; gap: 6px; }
 .previewRow input { background: #f8fafc; }
 .setupLocationRow { display: grid; grid-template-columns: 1fr 1fr 66px 58px 78px; gap: 6px; align-items: stretch; }

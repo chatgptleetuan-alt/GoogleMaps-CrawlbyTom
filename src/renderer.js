@@ -24,7 +24,8 @@ function readConfig() {
     const el = $(field);
     return [field, el?.type === "checkbox" ? el.checked : el?.value ?? ""];
   }));
-  config.locationMode = document.querySelector('input[name="locationMode"]:checked')?.value || "city";
+  const hasTextLocation = [config.address, config.mapsLink, config.province, config.district].some((value) => String(value || "").trim());
+  config.locationMode = hasTextLocation ? "address" : (config.currentLat && config.currentLng ? "current" : "address");
   config.exportColumns = checkedColumns("exportColumns");
   return config;
 }
@@ -36,9 +37,6 @@ function writeConfig(config) {
     if (el.type === "checkbox") el.checked = Boolean(config[field]);
     else el.value = config[field] ?? "";
   }
-  const mode = config.locationMode || "city";
-  const radio = document.querySelector(`input[name="locationMode"][value="${mode}"]`);
-  if (radio) radio.checked = true;
 }
 
 function keywords() {
@@ -66,7 +64,7 @@ function render(state, options = {}) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.0.6";
+  $("version").textContent = state.license?.version || "1.0.7";
   $("licenseStatus").textContent = state.license?.status || "local";
   renderColumns(options);
   renderTabs(options);
@@ -271,6 +269,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
   $("locate").addEventListener("click", locateCurrentPosition);
   $("browserLeaks").addEventListener("click", locateWithBrowserLeaks);
+  $("toggleScanPanel").addEventListener("click", () => {
+    document.querySelector(".campaignGrid").classList.toggle("collapsed");
+    $("toggleScanPanel").textContent = document.querySelector(".campaignGrid").classList.contains("collapsed") ? "Hien thiet lap" : "An thiet lap";
+  });
   $("previewLocation").addEventListener("click", previewScanLocation);
   $("openPreviewMap").addEventListener("click", () => {
     if (!previewCoords) return alert("Chua co toa do. Bam Kiem tra toa do truoc.");

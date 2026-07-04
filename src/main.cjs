@@ -24,19 +24,19 @@ const defaults = {
   config: {
     browserChannel: "msedge",
     locationMode: "city",
-    city: "Da Nang",
-    province: "Da Nang",
+    city: "",
+    province: "",
     district: "",
     address: "",
     mapsLink: "",
-    radiusKm: 5,
+    radiusKm: "",
     currentLat: "",
     currentLng: "",
-    maxResults: 50,
-    delayMin: 1500,
-    delayMax: 4000,
-    retry: 1,
-    threads: 1,
+    maxResults: "",
+    delayMin: "",
+    delayMax: "",
+    retry: "",
+    threads: "",
     distanceMode: "bird",
     headless: false,
     proxyList: "",
@@ -590,6 +590,16 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
 }
 
 async function buildSearchTarget(page, keyword, config, campaignId) {
+  const directCoords = coordsFromText(config.mapsLink) || coordsFromText(config.address);
+  if (directCoords) {
+    const radius = Number(config.radiusKm || 5);
+    return {
+      label: `toa do ${directCoords.lat},${directCoords.lng}`,
+      scopeKey: `direct:${directCoords.lat},${directCoords.lng}:r${radius}`,
+      coords: directCoords,
+      url: searchUrlAround(keyword, directCoords, radius)
+    };
+  }
   const mode = config.locationMode || "city";
   if (mode === "mapsLink" && config.mapsLink) {
     const coords = coordsFromText(config.mapsLink);
@@ -655,8 +665,7 @@ function targetFromCoords(keyword, config, label, scopePrefix, coords) {
 
 function searchUrlAround(keyword, coords, radiusKm) {
   const zoom = radiusToZoom(radiusKm);
-  const query = `${keyword} near ${coords.lat},${coords.lng}`;
-  return `https://www.google.com/maps/search/${encodeURIComponent(query)}/@${coords.lat},${coords.lng},${zoom}z`;
+  return `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${zoom}z`;
 }
 
 async function resolveSearchCenter(page, place, campaignId) {
@@ -741,6 +750,8 @@ function cityPlace(config) {
 
 function locationLabelFromConfig(config) {
   const mode = config.locationMode || "city";
+  const directText = String(config.address || config.mapsLink || "").trim();
+  if (directText) return directText;
   if (mode === "mapsLink") return String(config.mapsLink || "").trim();
   if (mode === "address") return withVietnam(config.address);
   if (mode === "current") return [config.currentLat, config.currentLng].filter(Boolean).join(",");
