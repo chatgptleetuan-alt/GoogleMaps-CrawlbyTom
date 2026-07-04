@@ -577,7 +577,8 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
     lead.search_location = target.label;
     applyBirdDistance(lead, config, target);
     if (isOutsideRadius(lead, config, target)) {
-      log("info", `Bo qua ngoai ban kinh ${config.radiusKm}km: ${lead.business_name} (${lead.bird_distance_km}km)`, campaignId);
+      const distanceText = Number.isFinite(Number(lead.bird_distance_km)) ? `${lead.bird_distance_km}km` : "khong doc duoc toa do that";
+      log("info", `Bo qua ngoai ban kinh ${config.radiusKm}km: ${lead.business_name} (${distanceText})`, campaignId);
       await sleep(randomDelay(config));
       continue;
     }
@@ -680,7 +681,16 @@ function targetFromCoords(keyword, config, label, scopePrefix, coords) {
 
 function searchUrlAround(keyword, coords, radiusKm) {
   const zoom = radiusToZoom(radiusKm);
-  return `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${zoom}z`;
+  const lat = normalizeCoord(coords.lat);
+  const lng = normalizeCoord(coords.lng);
+  const query = encodeURIComponent(keyword);
+  const anchor = encodeURIComponent(`${lat}, ${lng}`);
+  return `https://www.google.com/maps/search/${query}/@${lat},${lng},${zoom}z/data=!3m1!4b1!4m6!2m5!3m4!2s${anchor}!4m2!1d${lng}!2d${lat}`;
+}
+
+function normalizeCoord(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(7).replace(/0+$/, "").replace(/\.$/, "") : String(value || "").trim();
 }
 
 async function resolveSearchCenter(page, place, campaignId) {
@@ -818,16 +828,23 @@ function applyBirdDistance(lead, config, target) {
   const origin = originCoords(config, target);
   const lat = Number(lead.latitude);
   const lng = Number(lead.longitude);
-  if (!origin || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  if (!origin || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    lead.distance_status = target?.coords ? "missing_coords" : "";
+    return;
+  }
   const birdDistance = Number(haversineKm(origin.lat, origin.lng, lat, lng).toFixed(2));
   lead.bird_distance_km = birdDistance;
   lead.distance_km = birdDistance;
+  lead.distance_status = "ok";
 }
 
 function isOutsideRadius(lead, config, target) {
-  if (!target?.coords || !lead.bird_distance_km) return false;
+  if (!target?.coords) return false;
   const radius = Number(config.radiusKm || 0);
-  return radius > 0 && Number(lead.bird_distance_km) > radius;
+  if (radius <= 0) return false;
+  const distance = Number(lead.bird_distance_km);
+  if (!Number.isFinite(distance)) return true;
+  return distance > radius;
 }
 
 async function applyDrivingDistance(page, lead, config, target, campaignId) {
@@ -887,7 +904,10 @@ function firstKmFromDirections(text) {
 async function collectPlaceUrls(page, target, maxResults, campaignId, keyword) {
   if (target?.coords) {
     const ok = await openNearbySearch(page, target.coords, keyword, campaignId);
-    if (!ok) await page.goto(target.url, { waitUntil: "domcontentloaded", timeout: 45000 });
+    if (!ok) {
+      log("info", `Mo URL nearby co neo toa do ${target.coords.lat},${target.coords.lng}`, campaignId);
+      await page.goto(target.url, { waitUntil: "domcontentloaded", timeout: 45000 });
+    }
   } else {
     await page.goto(target.url || target, { waitUntil: "domcontentloaded", timeout: 45000 });
   }
@@ -925,8 +945,8 @@ async function collectPlaceUrls(page, target, maxResults, campaignId, keyword) {
 }
 
 async function openNearbySearch(page, coords, keyword, campaignId) {
-  const lat = coords.lat;
-  const lng = coords.lng;
+  const lat = normalizeCoord(coords.lat);
+  const lng = normalizeCoord(coords.lng);
   const placeUrl = `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},17z/data=!3m1!4b1!4m4!3m3!8m2!3d${lat}!4d${lng}`;
   try {
     await page.goto(placeUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -941,7 +961,7 @@ async function openNearbySearch(page, coords, keyword, campaignId) {
     log("info", `Da mo Nearby tai ${lat},${lng} va tim "${keyword}"`, campaignId);
     return true;
   } catch (error) {
-    log("warn", `Nearby flow loi, fallback search URL: ${error.message}`, campaignId);
+    log("warn", `Nearby flow loi, se dung URL search quanh toa do: ${error.message}`, campaignId);
     return false;
   }
 }
