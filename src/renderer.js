@@ -65,7 +65,7 @@ function render(state, options = {}) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.0.2";
+  $("version").textContent = state.license?.version || "1.0.3";
   $("licenseStatus").textContent = state.license?.status || "local";
   renderColumns(options);
   renderTabs(options);

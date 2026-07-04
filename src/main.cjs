@@ -13,6 +13,7 @@ let state;
 let running = false;
 let stopRequested = false;
 let stateSendTimer = null;
+const locationCache = new Map();
 
 const allColumns = [
   "keyword", "search_location", "business_name", "phone_number", "website", "address", "latitude", "longitude",
@@ -529,7 +530,7 @@ async function launchBrowser(chromium, config, proxyText, workerIndex) {
 }
 
 async function scanKeyword(page, keyword, config, campaignId, workerNo) {
-  const target = buildSearchTarget(keyword, config);
+  const target = await buildSearchTarget(page, keyword, config, campaignId);
   log("info", `Luong ${workerNo}: quet "${keyword}" tai ${target.label}`, campaignId);
   const existingCount = state.results.filter((row) => row.keyword === keyword && row.search_scope === target.scopeKey).length;
   const wantNew = Number(config.maxResults || 50);
@@ -543,7 +544,7 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
     if (lead?.business_name) {
       lead.search_scope = target.scopeKey;
       lead.search_location = target.label;
-      applyDistance(lead, config);
+      applyDistance(lead, config, target);
       const exists = isDuplicate(lead);
       if (exists) {
         log("info", `Bo qua trung: ${lead.business_name}`, campaignId);
@@ -561,7 +562,7 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   }
 }
 
-function buildSearchTarget(keyword, config) {
+async function buildSearchTarget(page, keyword, config, campaignId) {
   const mode = config.locationMode || "city";
   if (mode === "mapsLink" && config.mapsLink) {
     const coords = coordsFromText(config.mapsLink);
@@ -576,7 +577,10 @@ function buildSearchTarget(keyword, config) {
     return { label: "link Maps", scopeKey: `mapslink:${config.mapsLink}`, url: config.mapsLink };
   }
   if (mode === "address" && config.address) {
-    const query = `${keyword} near ${config.address}`;
+    const place = withVietnam(config.address);
+    const coords = await resolveSearchCenter(page, place, campaignId);
+    if (coords) return targetFromCoords(keyword, config, config.address, `address:${normalizeScope(config.address)}`, coords);
+    const query = `${keyword} near ${place}`;
     return { label: config.address, scopeKey: `address:${normalizeScope(config.address)}:r${Number(config.radiusKm || 5)}`, url: `https://www.google.com/maps/search/${encodeURIComponent(query)}` };
   }
   if (mode === "current" && config.currentLat && config.currentLng) {
@@ -587,8 +591,94 @@ function buildSearchTarget(keyword, config) {
       url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${config.currentLat},${config.currentLng},${Number(config.radiusKm || 5) + 10}z`
     };
   }
-  const place = [config.district, config.city, config.province].filter(Boolean).join(", ");
-  return { label: place || "Google Maps", scopeKey: `city:${normalizeScope(place || "global")}`, url: `https://www.google.com/maps/search/${encodeURIComponent(`${keyword} ${place}`.trim())}` };
+  const place = cityPlace(config);
+  const coords = place ? await resolveSearchCenter(page, place, campaignId) : null;
+  if (coords) return targetFromCoords(keyword, config, place, `city:${normalizeScope(place)}`, coords);
+  const query = place ? `${keyword} near ${place}` : keyword;
+  return { label: place || "Google Maps", scopeKey: `city:${normalizeScope(place || "global")}`, url: `https://www.google.com/maps/search/${encodeURIComponent(query)}` };
+}
+
+function targetFromCoords(keyword, config, label, scopePrefix, coords) {
+  const radius = Number(config.radiusKm || 5);
+  const zoom = radiusToZoom(radius);
+  return {
+    label: `${label} (${coords.lat},${coords.lng})`,
+    scopeKey: `${scopePrefix}:${coords.lat},${coords.lng}:r${radius}`,
+    coords,
+    url: `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${coords.lat},${coords.lng},${zoom}z`
+  };
+}
+
+async function resolveSearchCenter(page, place, campaignId) {
+  const key = normalizeScope(place);
+  if (locationCache.has(key)) return locationCache.get(key);
+  const nominatimCoords = await fetchNominatimCoords(place, campaignId);
+  if (nominatimCoords) {
+    locationCache.set(key, nominatimCoords);
+    return nominatimCoords;
+  }
+  try {
+    const searchPlace = withVietnam(place);
+    await page.goto(`https://www.google.com/maps/place/${encodeURIComponent(searchPlace)}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(2500);
+    await assertNoCaptcha(page);
+    const started = Date.now();
+    while (Date.now() - started < 12000) {
+      const coords = coordsFromText(page.url());
+      if (coords) {
+        log("info", `Da dinh vi khu vuc "${place}" -> ${coords.lat}, ${coords.lng}`, campaignId);
+        locationCache.set(key, coords);
+        return coords;
+      }
+      await page.waitForTimeout(500);
+    }
+    log("warn", `Khong dinh vi duoc khu vuc "${place}", se search bang chuoi dia diem`, campaignId);
+  } catch (error) {
+    log("warn", `Loi dinh vi khu vuc "${place}": ${error.message}`, campaignId);
+  }
+  return null;
+}
+
+async function fetchNominatimCoords(place, campaignId) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=vn&q=${encodeURIComponent(place)}`;
+    const res = await fetch(url, { headers: { "user-agent": "GoogleMapsCrawlerDesktop/1.0" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const [item] = await res.json();
+    const lat = item?.lat;
+    const lng = item?.lon;
+    if (!lat || !lng) return null;
+    log("info", `Da dinh vi khu vuc "${place}" bang OSM -> ${lat}, ${lng}`, campaignId);
+    return { lat: String(lat), lng: String(lng) };
+  } catch (error) {
+    log("warn", `OSM khong dinh vi duoc "${place}": ${error.message}`, campaignId);
+    return null;
+  }
+}
+
+function cityPlace(config) {
+  const parts = [config.district, config.city, config.province].map((value) => String(value || "").trim()).filter(Boolean);
+  let place = parts.join(", ");
+  const onlyProvince = parts.length === 1 ? parts[0] : "";
+  const cityMatch = onlyProvince.match(/^(?:tp\.?|thanh pho|th.nh ph.)\s+(.+)$/i);
+  if (cityMatch) place = `${onlyProvince}, tinh ${cityMatch[1]}`;
+  return withVietnam(place);
+}
+
+function withVietnam(value) {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+  return /vi[eệ]t\s*nam|vietnam/i.test(clean) ? clean : `${clean}, Viet Nam`;
+}
+
+function radiusToZoom(radiusKm) {
+  const radius = Number(radiusKm || 5);
+  if (radius <= 2) return 15;
+  if (radius <= 5) return 14;
+  if (radius <= 12) return 13;
+  if (radius <= 25) return 12;
+  if (radius <= 50) return 11;
+  return 10;
 }
 
 function normalizeScope(value) {
@@ -606,8 +696,9 @@ function coordsFromText(text) {
   return null;
 }
 
-function originCoords(config) {
-  if (config.currentLat && config.currentLng) return { lat: Number(config.currentLat), lng: Number(config.currentLng) };
+function originCoords(config, target) {
+  if ((config.locationMode || "city") === "current" && config.currentLat && config.currentLng) return { lat: Number(config.currentLat), lng: Number(config.currentLng) };
+  if (target?.coords) return { lat: Number(target.coords.lat), lng: Number(target.coords.lng) };
   if (config.mapsLink) {
     const coords = coordsFromText(config.mapsLink);
     if (coords) return { lat: Number(coords.lat), lng: Number(coords.lng) };
@@ -615,8 +706,8 @@ function originCoords(config) {
   return null;
 }
 
-function applyDistance(lead, config) {
-  const origin = originCoords(config);
+function applyDistance(lead, config, target) {
+  const origin = originCoords(config, target);
   const lat = Number(lead.latitude);
   const lng = Number(lead.longitude);
   if (!origin || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
