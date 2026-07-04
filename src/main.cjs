@@ -12,6 +12,7 @@ let mainWindow;
 let state;
 let running = false;
 let stopRequested = false;
+let stateSendTimer = null;
 
 const allColumns = [
   "keyword", "search_location", "business_name", "phone_number", "website", "address", "latitude", "longitude",
@@ -92,8 +93,20 @@ function publicState() {
   return { ...state, running, columns: allColumns };
 }
 
-function sendState() {
-  mainWindow?.webContents.send("state", publicState());
+function sendState(immediate = false) {
+  if (immediate) {
+    if (stateSendTimer) {
+      clearTimeout(stateSendTimer);
+      stateSendTimer = null;
+    }
+    mainWindow?.webContents.send("state", publicState());
+    return;
+  }
+  if (stateSendTimer) return;
+  stateSendTimer = setTimeout(() => {
+    stateSendTimer = null;
+    mainWindow?.webContents.send("state", publicState());
+  }, 180);
 }
 
 function createWindow() {

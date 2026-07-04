@@ -3,6 +3,15 @@ let appState = null;
 let activeKeyword = "all";
 let activeCampaignId = "";
 let selectedRows = new Set();
+let configHydrated = false;
+let columnsHydrated = false;
+let domReady = false;
+let pendingState = null;
+let renderFrame = 0;
+let lastRowsSignature = "";
+let lastTabsSignature = "";
+let lastLogsSignature = "";
+let lastHistorySignature = "";
 
 const configFields = [
   "province", "city", "district", "address", "mapsLink", "radiusKm", "currentLat", "currentLng",
@@ -46,45 +55,63 @@ function visibleRows() {
   });
 }
 
-function render(state) {
+function render(state, options = {}) {
   appState = state;
-  writeConfig(state.config || {});
+  if (options.hydrateConfig || !configHydrated) {
+    writeConfig(state.config || {});
+    configHydrated = true;
+  }
   $("runState").textContent = state.running ? "Running" : "Ready";
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
   $("version").textContent = state.license?.version || "1.0.1";
   $("licenseStatus").textContent = state.license?.status || "local";
-  renderColumns();
-  renderTabs();
-  renderRows();
-  renderLogs();
-  renderHistory();
+  renderColumns(options);
+  renderTabs(options);
+  renderRows(options);
+  renderLogs(options);
+  renderHistory(options);
 }
 
-function renderColumns() {
+function renderColumns(options = {}) {
+  if (columnsHydrated && !options.hydrateColumns) return;
   const selected = new Set(appState.config?.exportColumns || appState.columns || []);
   const html = (appState.columns || []).map((key) => `<label><input type="checkbox" value="${esc(key)}" ${selected.has(key) ? "checked" : ""}>${esc(key)}</label>`).join("");
   $("columns").innerHTML = html;
   $("exportColumns").innerHTML = html;
+  columnsHydrated = true;
 }
 
 function checkedColumns(containerId) {
   return Array.from($(containerId).querySelectorAll("input:checked")).map((input) => input.value);
 }
 
-function renderTabs() {
+function resultStamp() {
+  const results = appState?.results || [];
+  return `${results.length}:${results[0]?.id || ""}:${results[results.length - 1]?.id || ""}`;
+}
+
+function renderTabs(options = {}) {
   const counts = new Map();
   const source = activeCampaignId ? appState.results.filter((row) => row.campaignId === activeCampaignId) : appState.results;
+  const signature = `${activeCampaignId}:${activeKeyword}:${resultStamp()}`;
+  if (!options.force && signature === lastTabsSignature) return;
+  lastTabsSignature = signature;
   for (const row of source) counts.set(row.keyword, (counts.get(row.keyword) || 0) + 1);
   const tabs = [`<button class="tab ${activeKeyword === "all" ? "active" : ""}" data-keyword="all">Tat ca (${source.length})</button>`]
     .concat([...counts.entries()].map(([keyword, count]) => `<button class="tab ${activeKeyword === keyword ? "active" : ""}" data-keyword="${esc(keyword)}">${esc(keyword)} (${count})</button>`));
   $("keywordTabs").innerHTML = tabs.join("");
 }
 
-function renderRows() {
+function renderRows(options = {}) {
   const rows = visibleRows();
-  $("rows").innerHTML = rows.map((row, index) => `
+  const selectedSignature = [...selectedRows].sort().join(",");
+  const signature = `${activeCampaignId}:${activeKeyword}:${$("search").value}:${resultStamp()}:${selectedSignature}`;
+  if (!options.force && signature === lastRowsSignature) return;
+  lastRowsSignature = signature;
+  const displayRows = rows.slice(0, 500);
+  $("rows").innerHTML = displayRows.map((row, index) => `
     <tr>
       <td><input class="rowCheck" type="checkbox" value="${esc(row.id)}" ${selectedRows.has(row.id) ? "checked" : ""}></td>
       <td>${index + 1}</td>
@@ -105,14 +132,22 @@ function renderRows() {
   $("headCheck").checked = rows.length > 0 && rows.every((row) => selectedRows.has(row.id));
 }
 
-function renderLogs() {
+function renderLogs(options = {}) {
+  const logs = appState.logs || [];
+  const signature = `${logs.length}:${logs[0]?.id || ""}`;
+  if (!options.force && signature === lastLogsSignature) return;
+  lastLogsSignature = signature;
   $("logs").textContent = appState.logs
     .slice(0, 200)
     .map((log) => `[${new Date(log.time).toLocaleTimeString()}] [${log.level.toUpperCase()}] ${log.message}`)
     .join("\n");
 }
 
-function renderHistory() {
+function renderHistory(options = {}) {
+  const history = appState.history || [];
+  const signature = history.map((item) => `${item.id}:${item.name}:${item.status}:${item.finishedAt || ""}`).join("|");
+  if (!options.force && signature === lastHistorySignature) return;
+  lastHistorySignature = signature;
   $("historyList").innerHTML = (appState.history || []).map((item) => `
     <div class="historyItem" data-campaign-open="${esc(item.id)}">
       <div><b>${esc(item.name)}</b><div class="muted">${esc((item.keywords || []).join(", "))}</div></div>
@@ -135,10 +170,22 @@ function short(value) {
   return String(value).replace(/^https?:\/\//, "").slice(0, 46);
 }
 
-window.crawler.onState(render);
+function scheduleRender(state) {
+  pendingState = state;
+  if (!domReady || renderFrame) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = 0;
+    const nextState = pendingState;
+    pendingState = null;
+    if (nextState) render(nextState);
+  });
+}
+
+window.crawler.onState(scheduleRender);
 
 window.addEventListener("DOMContentLoaded", async () => {
-  render(await window.crawler.getState());
+  domReady = true;
+  render(await window.crawler.getState(), { hydrateConfig: true, hydrateColumns: true, force: true });
 
   document.querySelectorAll(".nav").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll(".nav").forEach((item) => item.classList.remove("active"));
@@ -152,8 +199,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (!button) return;
     activeKeyword = button.dataset.keyword;
     selectedRows.clear();
-    renderTabs();
-    renderRows();
+    renderTabs({ force: true });
+    renderRows({ force: true });
   });
 
   $("rows").addEventListener("change", (event) => {
@@ -169,14 +216,14 @@ window.addEventListener("DOMContentLoaded", async () => {
       await window.crawler.openExternal(open.dataset.open);
     }
     const del = event.target.closest("[data-delete]");
-    if (del && confirm("Xoa dong nay?")) render(await window.crawler.deleteRows([del.dataset.delete]));
+    if (del && confirm("Xoa dong nay?")) render(await window.crawler.deleteRows([del.dataset.delete]), { force: true });
   });
 
   $("historyList").addEventListener("click", async (event) => {
     const btn = event.target.closest("[data-campaign-delete]");
     if (btn) {
       event.stopPropagation();
-      if (confirm("Xoa chien dich va du lieu lien quan?")) render(await window.crawler.deleteCampaign(btn.dataset.campaignDelete));
+      if (confirm("Xoa chien dich va du lieu lien quan?")) render(await window.crawler.deleteCampaign(btn.dataset.campaignDelete), { force: true });
       return;
     }
     const item = event.target.closest("[data-campaign-open]");
@@ -185,14 +232,14 @@ window.addEventListener("DOMContentLoaded", async () => {
       activeKeyword = "all";
       selectedRows.clear();
       showPage("campaigns");
-      renderTabs();
-      renderRows();
+      renderTabs({ force: true });
+      renderRows({ force: true });
     }
   });
 
   $("headCheck").addEventListener("change", (event) => {
     for (const row of visibleRows()) event.target.checked ? selectedRows.add(row.id) : selectedRows.delete(row.id);
-    renderRows();
+    renderRows({ force: true });
   });
   $("selectAllColumns").addEventListener("click", () => {
     const boxes = Array.from($("columns").querySelectorAll("input[type='checkbox']"));
@@ -203,19 +250,23 @@ window.addEventListener("DOMContentLoaded", async () => {
     const ids = selectedVisibleIds();
     if (ids.length && confirm(`Xoa ${ids.length} dong da chon?`)) {
       selectedRows.clear();
-      render(await window.crawler.deleteRows(ids));
+      render(await window.crawler.deleteRows(ids), { force: true });
     }
   });
   $("clearVisible").addEventListener("click", async () => {
     if (confirm("Xoa ket qua trong tab hien tai?")) {
       const scope = activeKeyword === "all" ? {} : { keyword: activeKeyword };
       selectedRows.clear();
-      render(await window.crawler.clearResults(scope));
+      render(await window.crawler.clearResults(scope), { force: true });
     }
   });
 
-  $("search").addEventListener("input", renderRows);
-  $("saveConfig").addEventListener("click", async () => render(await window.crawler.saveConfig(readConfig())));
+  $("search").addEventListener("input", () => renderRows({ force: true }));
+  $("saveConfig").addEventListener("click", async () => {
+    const state = await window.crawler.saveConfig(readConfig());
+    appState = state;
+    render(state, { force: true });
+  });
   $("locate").addEventListener("click", locateCurrentPosition);
   $("browserLeaks").addEventListener("click", locateWithBrowserLeaks);
   $("openFolder").addEventListener("click", () => window.crawler.openDataFolder());
@@ -235,7 +286,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     activeCampaignId = "";
     activeKeyword = "all";
     selectedRows.clear();
-    render(await window.crawler.getState());
+    const state = await window.crawler.getState();
+    appState = state;
+    render(state, { force: true });
   });
   $("start").addEventListener("click", async () => {
     activeCampaignId = "";
@@ -256,7 +309,11 @@ function showPage(page) {
 async function locateWithBrowserLeaks() {
   alert("App se mo BrowserLeaks Geo trong Chrome/Edge. Neu trinh duyet hoi quyen vi tri, hay bam Allow roi cho app tu dien Lat/Lng.");
   const state = await window.crawler.browserLeaksLocation();
-  render(state);
+  if (state.locationOk) {
+    $("currentLat").value = state.config.currentLat || "";
+    $("currentLng").value = state.config.currentLng || "";
+  }
+  render(state, { force: true });
   if (state.locationOk) alert(`Da lay toa do BrowserLeaks: ${state.config.currentLat}, ${state.config.currentLng}`);
   else alert("BrowserLeaks khong tra ve toa do. Kiem tra log hoac nhap Lat/Lng thu cong.");
 }
@@ -266,17 +323,27 @@ async function locateCurrentPosition() {
     navigator.geolocation.getCurrentPosition(async (position) => {
       $("currentLat").value = position.coords.latitude.toFixed(7);
       $("currentLng").value = position.coords.longitude.toFixed(7);
-      render(await window.crawler.saveConfig(readConfig()));
+      const state = await window.crawler.saveConfig(readConfig());
+      appState = state;
+      render(state, { force: true });
       alert("Da lay vi tri hien tai bang quyen trinh duyet.");
     }, async () => {
       const state = await window.crawler.currentLocation();
-      render(state);
+      if (state.locationOk) {
+        $("currentLat").value = state.config.currentLat || "";
+        $("currentLng").value = state.config.currentLng || "";
+      }
+      render(state, { force: true });
       if (state.locationOk) alert(`Da lay toa do: ${state.config.currentLat}, ${state.config.currentLng}`);
       else alert("Khong lay duoc GPS/permission va IP cung khong tra ve toa do. Ban co the nhap Lat/Lng thu cong.");
     }, { enableHighAccuracy: true, timeout: 12000 });
   } else {
     const state = await window.crawler.currentLocation();
-    render(state);
+    if (state.locationOk) {
+      $("currentLat").value = state.config.currentLat || "";
+      $("currentLng").value = state.config.currentLng || "";
+    }
+    render(state, { force: true });
     if (state.locationOk) alert(`Da lay toa do: ${state.config.currentLat}, ${state.config.currentLng}`);
     else alert("Khong lay duoc toa do. Ban co the nhap Lat/Lng thu cong.");
   }
