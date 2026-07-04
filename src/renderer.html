@@ -21,6 +21,7 @@
   <main class="shell">
     <section class="page active" id="page-campaigns">
       <div class="topbar">
+        <button id="toggleSidebar">Menu</button>
         <input id="campaignName" placeholder="Ten chien dich">
         <input id="search" placeholder="Loc bang ket qua">
         <button id="toggleScanPanel">An thiet lap</button>
@@ -73,6 +74,10 @@
         </aside>
 
         <section class="resultsArea">
+          <div class="progressBox">
+            <div class="progressMeta"><span id="progressText">Ready</span><span id="progressPercent">0%</span></div>
+            <div class="progressTrack"><div id="progressFill"></div></div>
+          </div>
           <div class="keywordTabs" id="keywordTabs"></div>
           <div class="actions">
             <button id="selectAllColumns">Chon/bo chon cot</button>
@@ -129,7 +134,7 @@
     <section class="page" id="page-license">
       <div class="card">
         <h1>Ban quyen va cap nhat</h1>
-        <p>Ban local: <b id="version">1.0.7</b></p>
+        <p>Ban local: <b id="version">1.0.8</b></p>
         <p>Trang thai: <b id="licenseStatus">local</b></p>
         <button id="checkUpdate" class="primary">Tu dong tai va cap nhat</button>
         <button id="openRelease">Mo trang GitHub Releases</button>

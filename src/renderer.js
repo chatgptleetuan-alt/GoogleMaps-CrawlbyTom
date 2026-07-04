@@ -64,8 +64,12 @@ function render(state, options = {}) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.0.7";
+  $("version").textContent = state.license?.version || "1.0.8";
   $("licenseStatus").textContent = state.license?.status || "local";
+  const percent = state.progress?.percent || 0;
+  $("progressText").textContent = state.progress?.message || (state.running ? "Dang chay" : "Ready");
+  $("progressPercent").textContent = `${percent}%`;
+  $("progressFill").style.width = `${percent}%`;
   renderColumns(options);
   renderTabs(options);
   renderRows(options);
@@ -269,6 +273,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
   $("locate").addEventListener("click", locateCurrentPosition);
   $("browserLeaks").addEventListener("click", locateWithBrowserLeaks);
+  $("toggleSidebar").addEventListener("click", () => {
+    document.body.classList.toggle("sidebarHidden");
+    $("toggleSidebar").textContent = document.body.classList.contains("sidebarHidden") ? "Menu" : "Menu";
+  });
   $("toggleScanPanel").addEventListener("click", () => {
     document.querySelector(".campaignGrid").classList.toggle("collapsed");
     $("toggleScanPanel").textContent = document.querySelector(".campaignGrid").classList.contains("collapsed") ? "Hien thiet lap" : "An thiet lap";

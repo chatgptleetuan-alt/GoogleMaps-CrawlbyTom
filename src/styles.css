@@ -8,6 +8,8 @@ body {
   color: #1f2937;
   background: #eef2f7;
 }
+body.sidebarHidden { grid-template-columns: 0 1fr; }
+body.sidebarHidden .sidebar { padding: 0; overflow: hidden; border: 0; }
 .sidebar {
   display: grid;
   grid-template-rows: auto auto auto auto auto 1fr;
@@ -43,7 +45,7 @@ body {
 .topbar {
   height: 36px;
   display: grid;
-  grid-template-columns: 200px 1fr 112px 128px 112px 66px;
+  grid-template-columns: 64px 200px 1fr 112px 128px 112px 66px;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -141,7 +143,32 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 32px 36px 56px minmax(0, 1fr) 7px var(--log-height, 122px);
+  grid-template-rows: 34px 32px 36px 56px minmax(0, 1fr) 7px var(--log-height, 122px);
+}
+.progressBox {
+  padding: 5px 8px;
+  border-bottom: 1px solid #e5ebf3;
+  background: #fbfdff;
+}
+.progressMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #435166;
+  margin-bottom: 4px;
+}
+.progressTrack {
+  height: 7px;
+  border-radius: 999px;
+  background: #e3eaf3;
+  overflow: hidden;
+}
+#progressFill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: #0a8f78;
+  transition: width .2s ease;
 }
 .keywordTabs {
   display: flex;

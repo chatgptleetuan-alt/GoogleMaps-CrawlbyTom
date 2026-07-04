@@ -14,6 +14,7 @@ let running = false;
 let stopRequested = false;
 let stateSendTimer = null;
 const locationCache = new Map();
+let progress = { percent: 0, message: "Ready" };
 
 const allColumns = [
   "keyword", "search_location", "business_name", "phone_number", "website", "address", "latitude", "longitude",
@@ -92,7 +93,12 @@ function log(level, message, campaignId = state.currentCampaignId) {
 
 function publicState() {
   state.license.version = app.getVersion();
-  return { ...state, running, columns: allColumns };
+  return { ...state, running, progress, columns: allColumns };
+}
+
+function setProgress(percent, message) {
+  progress = { percent: Math.max(0, Math.min(100, Math.round(percent || 0))), message: message || "" };
+  sendState();
 }
 
 function sendState(immediate = false) {
@@ -460,6 +466,7 @@ ipcMain.handle("start-crawl", async (_event, payload) => {
   if (running) return publicState();
   running = true;
   stopRequested = false;
+  setProgress(0, "Dang khoi tao chien dich");
   state.config = { ...state.config, ...payload.config };
   const campaign = {
     id: crypto.randomUUID(),
@@ -488,6 +495,7 @@ ipcMain.handle("start-crawl", async (_event, payload) => {
     .finally(() => {
       running = false;
       stopRequested = false;
+      setProgress(100, "Hoan tat");
       saveState();
       sendState();
     });
@@ -500,6 +508,8 @@ async function crawl(keywords, config, campaignId) {
   const threads = Math.max(1, Math.min(8, Number(config.threads || 1)));
   const jobs = keywords.map((keyword) => ({ keyword }));
   let cursor = 0;
+  let completed = 0;
+  setProgress(1, "Bat dau chien dich");
   log("info", `Bat dau ${keywords.length} keyword, ${threads} luong, ${proxies.length || 1} proxy`, campaignId);
 
   const workers = Array.from({ length: threads }, async (_, index) => {
@@ -515,7 +525,10 @@ async function crawl(keywords, config, campaignId) {
       while (!stopRequested) {
         const job = jobs[cursor++];
         if (!job) break;
+        setProgress((completed / Math.max(1, jobs.length)) * 100, `Dang quet: ${job.keyword}`);
         await scanKeyword(page, job.keyword, config, campaignId, index + 1);
+        completed++;
+        setProgress((completed / Math.max(1, jobs.length)) * 100, `Da xong ${completed}/${jobs.length} keyword`);
       }
     } finally {
       await browser.close().catch(() => undefined);
@@ -546,12 +559,14 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   const existingCount = state.results.filter((row) => row.keyword === keyword && row.search_scope === target.scopeKey).length;
   const wantNew = Number(config.maxResults || 50);
   const crawlDepth = target.coords ? Math.min(500, Math.max(existingCount + wantNew * 4, wantNew + 25)) : Math.min(500, existingCount + wantNew);
-  const urls = await collectPlaceUrls(page, target.url, crawlDepth, campaignId);
+  setProgress(progress.percent, `Mo Google Maps quanh khu vuc: ${keyword}`);
+  const urls = await collectPlaceUrls(page, target, crawlDepth, campaignId, keyword);
   log("info", `Luong ${workerNo}: "${keyword}" da co ${existingCount}, keo ${urls.length} link de lay them ${wantNew}`, campaignId);
   const candidates = [];
   const localSeen = new Set();
   for (const url of urls) {
     if (stopRequested) break;
+    setProgress(progress.percent, `Dang doc dia diem ${candidates.length + 1}/${urls.length}: ${keyword}`);
     const lead = await retry(() => extractPlace(page, url, keyword, campaignId), Number(config.retry || 0), campaignId);
     if (lead?.business_name) {
       lead.search_scope = target.scopeKey;
@@ -578,6 +593,7 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   let inserted = 0;
   for (const lead of candidates.slice(0, wantNew)) {
     if (stopRequested) break;
+    setProgress(progress.percent, `Dang them ket qua ${inserted + 1}/${Math.min(wantNew, candidates.length)}: ${keyword}`);
     await applyDrivingDistance(page, lead, config, target, campaignId);
     state.results.unshift(lead);
     state.results = state.results.slice(0, 100000);
@@ -869,8 +885,13 @@ function firstKmFromDirections(text) {
   return Number(matches[0].toFixed(2));
 }
 
-async function collectPlaceUrls(page, searchUrl, maxResults, campaignId) {
-  await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+async function collectPlaceUrls(page, target, maxResults, campaignId, keyword) {
+  if (target?.coords) {
+    const ok = await openNearbySearch(page, target.coords, keyword, campaignId);
+    if (!ok) await page.goto(target.url, { waitUntil: "domcontentloaded", timeout: 45000 });
+  } else {
+    await page.goto(target.url || target, { waitUntil: "domcontentloaded", timeout: 45000 });
+  }
   await page.waitForTimeout(3500);
   await assertNoCaptcha(page);
   const urls = new Set();
@@ -889,6 +910,44 @@ async function collectPlaceUrls(page, searchUrl, maxResults, campaignId) {
   }
   if (!urls.size) log("warn", "Khong thay danh sach ket qua, Google co the doi giao dien hoac dang chan truy cap", campaignId);
   return [...urls].slice(0, maxResults);
+}
+
+async function openNearbySearch(page, coords, keyword, campaignId) {
+  const lat = coords.lat;
+  const lng = coords.lng;
+  const placeUrl = `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},17z/data=!3m1!4b1!4m4!3m3!8m2!3d${lat}!4d${lng}`;
+  try {
+    await page.goto(placeUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(3000);
+    await assertNoCaptcha(page);
+    await clickNearby(page);
+    await page.waitForTimeout(700);
+    const box = page.locator("#searchboxinput, input[name='q'], input[aria-label*='Search'], input[aria-label*='Tim'], input[aria-label*='Tìm']").first();
+    await box.fill(keyword, { timeout: 12000 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(4500);
+    log("info", `Da mo Nearby tai ${lat},${lng} va tim "${keyword}"`, campaignId);
+    return true;
+  } catch (error) {
+    log("warn", `Nearby flow loi, fallback search URL: ${error.message}`, campaignId);
+    return false;
+  }
+}
+
+async function clickNearby(page) {
+  const nearbyPattern = /Nearby|Gần đó|Gan do|Gần đây|Lân cận|Lan can/i;
+  const attempts = [
+    () => page.getByRole("button", { name: nearbyPattern }).click({ timeout: 5000 }),
+    () => page.locator("button").filter({ hasText: nearbyPattern }).first().click({ timeout: 5000 }),
+    () => page.locator("[aria-label*='Nearby'], [aria-label*='Gần đó'], [aria-label*='Gan do'], [aria-label*='Lân cận'], [aria-label*='Lan can']").first().click({ timeout: 5000 })
+  ];
+  for (const attempt of attempts) {
+    try {
+      await attempt();
+      return;
+    } catch {}
+  }
+  throw new Error("Khong bam duoc nut Nearby");
 }
 
 async function extractPlace(page, url, keyword, campaignId) {
