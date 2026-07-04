@@ -48,6 +48,7 @@ const defaults = {
   campaigns: [],
   history: [],
   results: [],
+  scanCursors: {},
   logs: [],
   license: { status: "local", version: app.getVersion() }
 };
@@ -73,6 +74,7 @@ function loadState() {
       ...clone(defaults),
       ...loaded,
       config: { ...clone(defaults.config), ...(loaded.config || {}) },
+      scanCursors: { ...(loaded.scanCursors || {}) },
       license: { ...clone(defaults.license), ...(loaded.license || {}) }
     };
   } catch {
@@ -248,9 +250,15 @@ ipcMain.handle("rename-campaign", (_event, campaignId, name) => {
 });
 
 ipcMain.handle("clear-results", (_event, scope) => {
-  if (scope?.campaignId) state.results = state.results.filter((row) => row.campaignId !== scope.campaignId);
-  else if (scope?.keyword) state.results = state.results.filter((row) => row.keyword !== scope.keyword);
-  else state.results = [];
+  if (scope?.campaignId) {
+    state.results = state.results.filter((row) => row.campaignId !== scope.campaignId);
+  } else if (scope?.keyword) {
+    state.results = state.results.filter((row) => row.keyword !== scope.keyword);
+    resetScanCursorsForKeyword(scope.keyword);
+  } else {
+    state.results = [];
+    state.scanCursors = {};
+  }
   saveState();
   return publicState();
 });
@@ -557,15 +565,22 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   const target = await buildSearchTarget(page, keyword, config, campaignId);
   log("info", `Luong ${workerNo}: quet "${keyword}" tai ${target.label}`, campaignId);
   const existingCount = state.results.filter((row) => row.keyword === keyword && row.search_scope === target.scopeKey).length;
+  const cursorKey = scanCursorKey(keyword, target);
+  const savedCursor = Number(state.scanCursors?.[cursorKey] || 0);
+  const startIndex = Math.max(savedCursor, existingCount);
   const wantNew = Number(config.maxResults || 50);
-  const crawlDepth = target.coords ? Math.min(500, Math.max(existingCount + wantNew * 4, wantNew + 25)) : Math.min(500, existingCount + wantNew);
+  const crawlDepth = Math.min(500, startIndex + wantNew);
   setProgress(progress.percent, `Mo Google Maps quanh khu vuc: ${keyword}`);
   const urls = await collectPlaceUrls(page, target, crawlDepth, campaignId, keyword);
-  log("info", `Luong ${workerNo}: "${keyword}" da co ${existingCount}, keo ${urls.length} link de lay them ${wantNew}`, campaignId);
+  const todoUrls = urls.slice(startIndex, startIndex + wantNew);
+  log("info", `Luong ${workerNo}: "${keyword}" bat dau tu ket qua #${startIndex + 1}, co ${todoUrls.length} link de lay them ${wantNew}`, campaignId);
   const localSeen = new Set();
   let inserted = 0;
-  for (const url of urls) {
+  let nextCursor = startIndex;
+  for (const url of todoUrls) {
     if (stopRequested) break;
+    nextCursor++;
+    state.scanCursors[cursorKey] = nextCursor;
     setProgress(progress.percent, `Dang doc dia diem ${inserted + 1}/${wantNew}: ${keyword}`);
     const lead = await retry(() => extractPlace(page, url, keyword, campaignId), Number(config.retry || 0), campaignId);
     if (!lead?.business_name) {
@@ -591,8 +606,8 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
         localSeen.add(key);
         setProgress(progress.percent, `Dang ghi ket qua ${inserted + 1}/${wantNew}: ${keyword}`);
         await applyDrivingDistance(page, lead, config, target, campaignId);
-        state.results.unshift(lead);
-        state.results = state.results.slice(0, 100000);
+        state.results.push(lead);
+        state.results = state.results.slice(-100000);
         inserted++;
         log("info", `Them moi ${keyword} #${inserted}: ${lead.business_name}`, campaignId);
         saveState();
@@ -602,6 +617,7 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
     }
     await sleep(randomDelay(config));
   }
+  saveState();
   log("info", `Luong ${workerNo}: "${keyword}" da ghi ${inserted}/${wantNew} ket qua hop le`, campaignId);
 }
 
@@ -920,18 +936,29 @@ async function collectPlaceUrls(page, target, maxResults, campaignId, keyword) {
     const batch = await page.evaluate(() => {
       const isAd = (anchor) => {
         let node = anchor;
-        for (let i = 0; i < 6 && node; i++) {
+        for (let i = 0; i < 8 && node; i++) {
           const text = node.innerText || node.textContent || "";
           if (/Sponsored|Ad\s*·|Được tài trợ|Duoc tai tro|Quảng cáo|Quang cao/i.test(text)) return true;
           node = node.parentElement;
         }
         return false;
       };
-      return Array.from(document.querySelectorAll('a[href*="/maps/place/"]'))
-        .filter((anchor) => !isAd(anchor))
-        .map((anchor) => anchor.href);
+      const cleanUrl = (href) => String(href || "").split("&")[0];
+      const feed = document.querySelector('div[role="feed"]') || document;
+      const anchors = Array.from(feed.querySelectorAll('a[href*="/maps/place/"]'));
+      const ordered = [];
+      const seen = new Set();
+      for (const anchor of anchors) {
+        if (isAd(anchor)) continue;
+        if (!anchor.getClientRects().length) continue;
+        const href = cleanUrl(anchor.href);
+        if (!href || seen.has(href)) continue;
+        seen.add(href);
+        ordered.push(href);
+      }
+      return ordered;
     });
-    for (const href of batch) urls.add(String(href).split("&")[0]);
+    for (const href of batch) urls.add(href);
     stableRounds = urls.size === before ? stableRounds + 1 : 0;
     if (stableRounds >= 5) break;
     const feed = page.locator('div[role="feed"]');
@@ -1109,6 +1136,17 @@ function isDuplicate(lead) {
 
 function duplicateKey(row) {
   return row.google_maps_url || row.phone_number || `${row.business_name}|${row.address}`;
+}
+
+function scanCursorKey(keyword, target) {
+  return `${normalizeScope(keyword)}::${target.scopeKey || target.label || ""}`;
+}
+
+function resetScanCursorsForKeyword(keyword) {
+  const prefix = `${normalizeScope(keyword)}::`;
+  for (const key of Object.keys(state.scanCursors || {})) {
+    if (key.startsWith(prefix)) delete state.scanCursors[key];
+  }
 }
 
 function filterRows(options) {
