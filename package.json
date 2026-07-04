@@ -1,6 +1,6 @@
 {
   "name": "google-maps-crawler-desktop",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "Desktop Google Maps browser crawler",
   "main": "src/main.cjs",

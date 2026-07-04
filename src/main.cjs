@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+﻿const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { execFile, spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -562,47 +562,46 @@ async function scanKeyword(page, keyword, config, campaignId, workerNo) {
   setProgress(progress.percent, `Mo Google Maps quanh khu vuc: ${keyword}`);
   const urls = await collectPlaceUrls(page, target, crawlDepth, campaignId, keyword);
   log("info", `Luong ${workerNo}: "${keyword}" da co ${existingCount}, keo ${urls.length} link de lay them ${wantNew}`, campaignId);
-  const candidates = [];
   const localSeen = new Set();
+  let inserted = 0;
   for (const url of urls) {
     if (stopRequested) break;
-    setProgress(progress.percent, `Dang doc dia diem ${candidates.length + 1}/${urls.length}: ${keyword}`);
+    setProgress(progress.percent, `Dang doc dia diem ${inserted + 1}/${wantNew}: ${keyword}`);
     const lead = await retry(() => extractPlace(page, url, keyword, campaignId), Number(config.retry || 0), campaignId);
-    if (lead?.business_name) {
-      lead.search_scope = target.scopeKey;
-      lead.search_location = target.label;
-      applyBirdDistance(lead, config, target);
-      if (isOutsideRadius(lead, config, target)) {
-        log("info", `Bo qua ngoai ban kinh ${config.radiusKm}km: ${lead.business_name} (${lead.bird_distance_km}km)`, campaignId);
-        continue;
-      }
-      const exists = isDuplicate(lead);
-      if (exists) {
-        log("info", `Bo qua trung: ${lead.business_name}`, campaignId);
-      } else {
-        const key = duplicateKey(lead);
-        if (!localSeen.has(key)) {
-          localSeen.add(key);
-          candidates.push(lead);
-        }
+    if (!lead?.business_name) {
+      log("warn", `Bo qua link khong doc duoc ten dia diem: ${url.slice(0, 120)}`, campaignId);
+      await sleep(randomDelay(config));
+      continue;
+    }
+    lead.search_scope = target.scopeKey;
+    lead.search_location = target.label;
+    applyBirdDistance(lead, config, target);
+    if (isOutsideRadius(lead, config, target)) {
+      log("info", `Bo qua ngoai ban kinh ${config.radiusKm}km: ${lead.business_name} (${lead.bird_distance_km}km)`, campaignId);
+      await sleep(randomDelay(config));
+      continue;
+    }
+    const exists = isDuplicate(lead);
+    if (exists) {
+      log("info", `Bo qua trung: ${lead.business_name}`, campaignId);
+    } else {
+      const key = duplicateKey(lead);
+      if (!localSeen.has(key)) {
+        localSeen.add(key);
+        setProgress(progress.percent, `Dang ghi ket qua ${inserted + 1}/${wantNew}: ${keyword}`);
+        await applyDrivingDistance(page, lead, config, target, campaignId);
+        state.results.unshift(lead);
+        state.results = state.results.slice(0, 100000);
+        inserted++;
+        log("info", `Them moi ${keyword} #${inserted}: ${lead.business_name}`, campaignId);
+        saveState();
+        sendState();
+        if (inserted >= wantNew) break;
       }
     }
     await sleep(randomDelay(config));
   }
-  if (target.coords) candidates.sort((a, b) => Number(a.bird_distance_km || 999999) - Number(b.bird_distance_km || 999999));
-  let inserted = 0;
-  for (const lead of candidates.slice(0, wantNew)) {
-    if (stopRequested) break;
-    setProgress(progress.percent, `Dang them ket qua ${inserted + 1}/${Math.min(wantNew, candidates.length)}: ${keyword}`);
-    await applyDrivingDistance(page, lead, config, target, campaignId);
-    state.results.unshift(lead);
-    state.results = state.results.slice(0, 100000);
-    inserted++;
-    log("info", `Them moi ${keyword} #${inserted}: ${lead.business_name}`, campaignId);
-    saveState();
-    sendState();
-    await sleep(randomDelay(config));
-  }
+  log("info", `Luong ${workerNo}: "${keyword}" da ghi ${inserted}/${wantNew} ket qua hop le`, campaignId);
 }
 
 async function buildSearchTarget(page, keyword, config, campaignId) {
@@ -777,7 +776,7 @@ function locationLabelFromConfig(config) {
 function withVietnam(value) {
   const clean = String(value || "").trim();
   if (!clean) return "";
-  return /vi[eệ]t\s*nam|vietnam/i.test(clean) ? clean : `${clean}, Viet Nam`;
+  return /vi[eá»‡]t\s*nam|vietnam/i.test(clean) ? clean : `${clean}, Viet Nam`;
 }
 
 function radiusToZoom(radiusKm) {
@@ -922,7 +921,7 @@ async function openNearbySearch(page, coords, keyword, campaignId) {
     await assertNoCaptcha(page);
     await clickNearby(page);
     await page.waitForTimeout(700);
-    const box = page.locator("#searchboxinput, input[name='q'], input[aria-label*='Search'], input[aria-label*='Tim'], input[aria-label*='Tìm']").first();
+    const box = page.locator("#searchboxinput, input[name='q'], input[aria-label*='Search'], input[aria-label*='Tim'], input[aria-label*='TÃ¬m']").first();
     await box.fill(keyword, { timeout: 12000 });
     await page.keyboard.press("Enter");
     await page.waitForTimeout(4500);
@@ -935,11 +934,22 @@ async function openNearbySearch(page, coords, keyword, campaignId) {
 }
 
 async function clickNearby(page) {
-  const nearbyPattern = /Nearby|Gần đó|Gan do|Gần đây|Lân cận|Lan can/i;
   const attempts = [
-    () => page.getByRole("button", { name: nearbyPattern }).click({ timeout: 5000 }),
-    () => page.locator("button").filter({ hasText: nearbyPattern }).first().click({ timeout: 5000 }),
-    () => page.locator("[aria-label*='Nearby'], [aria-label*='Gần đó'], [aria-label*='Gan do'], [aria-label*='Lân cận'], [aria-label*='Lan can']").first().click({ timeout: 5000 })
+    () => page.getByRole("button", { name: /Nearby/i }).click({ timeout: 4000 }),
+    () => page.locator("[aria-label*='Nearby']").first().click({ timeout: 4000 }),
+    () => page.evaluate(() => {
+      const fold = (value) => String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      const elements = Array.from(document.querySelectorAll("button, [role='button'], [aria-label]"));
+      const element = elements.find((el) => {
+        const text = fold(`${el.textContent || ""} ${el.getAttribute("aria-label") || ""}`);
+        return text.includes("nearby") || text.includes("gan do") || text.includes("lan can");
+      });
+      if (!element) throw new Error("Nearby button not found");
+      element.click();
+    })
   ];
   for (const attempt of attempts) {
     try {
@@ -949,7 +959,6 @@ async function clickNearby(page) {
   }
   throw new Error("Khong bam duoc nut Nearby");
 }
-
 async function extractPlace(page, url, keyword, campaignId) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.waitForTimeout(2200);
@@ -970,7 +979,7 @@ async function extractPlace(page, url, keyword, campaignId) {
     const coords = bangMatch || atMatch;
     const category = clean(Array.from(document.querySelectorAll("button, span"))
       .map((el) => el.textContent || "")
-      .find((v) => v.length > 2 && v.length < 60 && !v.includes(kw) && !/\d|Đánh giá|Reviews|sao/.test(v)));
+      .find((v) => v.length > 2 && v.length < 60 && !v.includes(kw) && !/\d|ÄÃ¡nh giÃ¡|Reviews|sao/.test(v)));
     return {
       id: crypto.randomUUID(),
       campaignId,
@@ -993,7 +1002,7 @@ async function extractPlace(page, url, keyword, campaignId) {
 
 async function assertNoCaptcha(page) {
   const text = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
-  if (/captcha|recaptcha|unusual traffic|not a robot|xác minh|không phải là rô-bốt/i.test(text)) {
+  if (/captcha|recaptcha|unusual traffic|not a robot|xÃ¡c minh|khÃ´ng pháº£i lÃ  rÃ´-bá»‘t/i.test(text)) {
     throw new Error("Google dang yeu cau xac minh/CAPTCHA. App se khong tu vuot CAPTCHA; hay giam toc do, doi proxy sach hoac xu ly thu cong.");
   }
 }
