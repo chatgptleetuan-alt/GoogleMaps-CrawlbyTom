@@ -12,6 +12,7 @@ let lastRowsSignature = "";
 let lastTabsSignature = "";
 let lastLogsSignature = "";
 let lastHistorySignature = "";
+let previewCoords = null;
 
 const configFields = [
   "province", "city", "district", "address", "mapsLink", "radiusKm", "currentLat", "currentLng",
@@ -65,7 +66,7 @@ function render(state, options = {}) {
   $("totalRows").textContent = `${state.results.length} ket qua`;
   $("start").disabled = state.running;
   $("stop").disabled = !state.running;
-  $("version").textContent = state.license?.version || "1.0.3";
+  $("version").textContent = state.license?.version || "1.0.4";
   $("licenseStatus").textContent = state.license?.status || "local";
   renderColumns(options);
   renderTabs(options);
@@ -116,7 +117,7 @@ function renderRows(options = {}) {
       <td><input class="rowCheck" type="checkbox" value="${esc(row.id)}" ${selectedRows.has(row.id) ? "checked" : ""}></td>
       <td>${index + 1}</td>
       <td>${esc(row.keyword)}</td>
-      <td class="placeName"><b>${esc(row.business_name)}</b><div class="muted">${esc(row.category || "")}</div></td>
+      <td class="placeName"><b>${esc(row.business_name)}</b></td>
       <td>${esc(row.phone_number || "Chua cap nhat")}</td>
       <td>${row.website ? `<a href="#" data-open="${esc(row.website)}">${esc(short(row.website))}</a>` : "Chua cap nhat"}</td>
       <td>${esc(row.address || "Chua cap nhat")}</td>
@@ -269,6 +270,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
   $("locate").addEventListener("click", locateCurrentPosition);
   $("browserLeaks").addEventListener("click", locateWithBrowserLeaks);
+  $("previewLocation").addEventListener("click", previewScanLocation);
+  $("openPreviewMap").addEventListener("click", () => {
+    if (!previewCoords) return alert("Chua co toa do. Bam Kiem tra toa do truoc.");
+    window.crawler.openExternal(`https://www.google.com/maps/search/?api=1&query=${previewCoords.lat},${previewCoords.lng}`);
+  });
+  setupResultSplitter();
   $("openFolder").addEventListener("click", () => window.crawler.openDataFolder());
   $("checkUpdate").addEventListener("click", async () => {
     $("checkUpdate").disabled = true;
@@ -300,6 +307,30 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("xlsx").addEventListener("click", () => exportNow("xlsx"));
 });
 
+function setupResultSplitter() {
+  const splitter = $("resultSplitter");
+  const area = document.querySelector(".resultsArea");
+  if (!splitter || !area) return;
+  splitter.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    splitter.setPointerCapture(event.pointerId);
+    const startY = event.clientY;
+    const startHeight = Number(getComputedStyle(area).getPropertyValue("--log-height").replace("px", "")) || 122;
+    const move = (moveEvent) => {
+      const next = Math.max(70, Math.min(360, startHeight - (moveEvent.clientY - startY)));
+      area.style.setProperty("--log-height", `${next}px`);
+    };
+    const up = () => {
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", up);
+      splitter.removeEventListener("pointercancel", up);
+    };
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", up);
+    splitter.addEventListener("pointercancel", up);
+  });
+}
+
 function showPage(page) {
   document.querySelectorAll(".nav").forEach((item) => item.classList.toggle("active", item.dataset.page === page));
   document.querySelectorAll(".page").forEach((item) => item.classList.remove("active"));
@@ -316,6 +347,25 @@ async function locateWithBrowserLeaks() {
   render(state, { force: true });
   if (state.locationOk) alert(`Da lay toa do BrowserLeaks: ${state.config.currentLat}, ${state.config.currentLng}`);
   else alert("BrowserLeaks khong tra ve toa do. Kiem tra log hoac nhap Lat/Lng thu cong.");
+}
+
+async function previewScanLocation() {
+  $("previewLocation").disabled = true;
+  $("previewLocation").textContent = "Dang kiem tra";
+  try {
+    const result = await window.crawler.previewLocation(readConfig());
+    if (!result?.ok) {
+      previewCoords = null;
+      $("previewCoords").value = result?.message || "Khong dinh vi duoc khu vuc";
+      alert($("previewCoords").value);
+      return;
+    }
+    previewCoords = { lat: result.lat, lng: result.lng };
+    $("previewCoords").value = `${result.label}: ${result.lat}, ${result.lng}`;
+  } finally {
+    $("previewLocation").disabled = false;
+    $("previewLocation").textContent = "Kiem tra toa do";
+  }
 }
 
 async function locateCurrentPosition() {

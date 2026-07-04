@@ -53,6 +53,11 @@
               <input id="address" placeholder="Dia chi trung tam">
               <input id="mapsLink" placeholder="Link Google Maps/toa do">
             </div>
+            <div class="previewRow">
+              <button id="previewLocation">Kiem tra toa do</button>
+              <input id="previewCoords" readonly placeholder="Toa do tam khu vuc se hien tai day truoc khi quet">
+              <button id="openPreviewMap">Mo Map</button>
+            </div>
           </div>
           <div class="scanGroup runGroup">
             <div class="groupTitle">Thiet lap</div>
@@ -96,6 +101,7 @@
               <tbody id="rows"></tbody>
             </table>
           </div>
+          <div class="splitter" id="resultSplitter" title="Keo de doi chieu cao bang va nhat ky"></div>
           <div class="logs">
             <div class="logTitle">NHAT KY HOAT DONG</div>
             <pre id="logs"></pre>
@@ -130,7 +136,7 @@
     <section class="page" id="page-license">
       <div class="card">
         <h1>Ban quyen va cap nhat</h1>
-        <p>Ban local: <b id="version">1.0.3</b></p>
+        <p>Ban local: <b id="version">1.0.4</b></p>
         <p>Trang thai: <b id="licenseStatus">local</b></p>
         <button id="checkUpdate" class="primary">Tu dong tai va cap nhat</button>
         <button id="openRelease">Mo trang GitHub Releases</button>

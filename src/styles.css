@@ -66,7 +66,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   height: calc(100vh - 64px);
   min-height: 0;
   display: grid;
-  grid-template-rows: 166px 1fr;
+  grid-template-rows: 174px 1fr;
   grid-template-columns: 1fr;
   gap: 10px;
 }
@@ -127,6 +127,8 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.previewRow { display: grid; grid-template-columns: 128px 1fr 78px; gap: 6px; }
+.previewRow input { background: #f8fafc; }
 .setupLocationRow { display: grid; grid-template-columns: 1fr 1fr 66px 58px 78px; gap: 6px; align-items: stretch; }
 .setupLocationRow .check { min-width: 0; padding-inline: 6px; white-space: nowrap; }
 .primary { background: #0a8f78; color: #fff; }
@@ -135,7 +137,7 @@ h2 { font-size: 13px; text-transform: uppercase; color: #334155; }
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 34px 38px 36px 1fr 122px;
+  grid-template-rows: 34px 38px 36px minmax(0, 1fr) 7px var(--log-height, 122px);
 }
 .keywordTabs {
   display: flex;
@@ -209,9 +211,17 @@ td a { color: #08745f; font-weight: 700; text-decoration: none; }
 .muted { color: #718096; font-size: 12px; }
 .ok { color: #0a8f78; font-weight: 800; }
 .rowBtn { width: auto; padding: 4px 6px; white-space: nowrap; }
+.splitter {
+  min-height: 7px;
+  cursor: row-resize;
+  background: linear-gradient(#eef3f9, #d9e2ee);
+  border-top: 1px solid #d6dfeb;
+  border-bottom: 1px solid #cbd6e4;
+}
+.splitter:hover { background: #cbd6e4; }
 .logs { min-height: 0; background: #101216; color: #e9edf5; border-radius: 0 0 8px 8px; }
 .logTitle { padding: 7px 10px; border-bottom: 1px solid #2c3340; font-size: 12px; font-weight: 800; }
-pre { height: 84px; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; font: 12px Consolas, monospace; }
+pre { height: calc(100% - 30px); overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; font: 12px Consolas, monospace; }
 .hint { margin: -4px 0 8px; color: #607086; font-size: 13px; }
 .panelHead {
   height: 48px;

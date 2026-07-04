@@ -113,8 +113,8 @@ function sendState(immediate = false) {
 function createWindow() {
   state = loadState();
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 860,
+    width: 1680,
+    height: 920,
     minWidth: 1180,
     minHeight: 740,
     title: "Google Maps Crawler Desktop",
@@ -256,6 +256,16 @@ ipcMain.handle("delete-campaign", (_event, campaignId) => {
   if (state.currentCampaignId === campaignId) state.currentCampaignId = state.campaigns[0]?.id || "";
   saveState();
   return publicState();
+});
+
+ipcMain.handle("preview-location", async (_event, config) => {
+  const preview = await previewScanLocation({ ...state.config, ...(config || {}) });
+  if (preview.ok) {
+    log("info", `Kiem tra toa do: ${preview.label} -> ${preview.lat}, ${preview.lng}`);
+  } else {
+    log("warn", `Kiem tra toa do loi: ${preview.message}`);
+  }
+  return preview;
 });
 
 ipcMain.handle("current-location", async () => {
@@ -596,6 +606,24 @@ async function buildSearchTarget(page, keyword, config, campaignId) {
   if (coords) return targetFromCoords(keyword, config, place, `city:${normalizeScope(place)}`, coords);
   const query = place ? `${keyword} near ${place}` : keyword;
   return { label: place || "Google Maps", scopeKey: `city:${normalizeScope(place || "global")}`, url: `https://www.google.com/maps/search/${encodeURIComponent(query)}` };
+}
+
+async function previewScanLocation(config) {
+  const mode = config.locationMode || "city";
+  if (mode === "current") {
+    if (!config.currentLat || !config.currentLng) return { ok: false, message: "Chua co Lat/Lng hien tai" };
+    return { ok: true, label: "Vi tri hien tai", lat: String(config.currentLat), lng: String(config.currentLng), source: "current" };
+  }
+  if (mode === "mapsLink") {
+    const coords = coordsFromText(config.mapsLink);
+    if (!coords) return { ok: false, message: "Link Maps/toa do khong co cap lat,lng hop le" };
+    return { ok: true, label: "Link Maps", lat: coords.lat, lng: coords.lng, source: "mapsLink" };
+  }
+  const label = mode === "address" ? String(config.address || "").trim() : cityPlace(config);
+  if (!label) return { ok: false, message: "Chua nhap khu vuc de dinh vi" };
+  const coords = await fetchNominatimCoords(label, state.currentCampaignId || "");
+  if (!coords) return { ok: false, message: `Khong dinh vi duoc "${label}"` };
+  return { ok: true, label, lat: coords.lat, lng: coords.lng, source: "OSM" };
 }
 
 function targetFromCoords(keyword, config, label, scopePrefix, coords) {
